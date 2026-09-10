@@ -1,0 +1,1144 @@
+<script>
+/* ==================================================================
+   หน้าจอทั้งหมดของระบบ
+   ================================================================== */
+
+/* ------------------------------------------------------------------ */
+/* 1. แดชบอร์ด                                                         */
+/* ------------------------------------------------------------------ */
+
+VIEWS.dashboard = function (root) {
+  return call('apiDashboard', [S.token]).then(function (d) {
+    clearCharts();
+    updatePendingBadge(d.stats.pending);
+
+    var st = d.stats;
+    var ratioNote = st.meritRatio === null
+      ? 'ยังไม่มีการหักคะแนนเดือนนี้'
+      : (st.meritRatio >= 3 ? 'อยู่ในเกณฑ์ดี (เป้าหมาย 3:1)' : 'ต่ำกว่าเป้าหมาย 3:1 ควรส่งเสริมการบันทึกความดี');
+
+    root.innerHTML =
+      '<div class="grid grid-4" style="margin-bottom:16px">' +
+        statCard('👥', 'นักเรียนทั้งหมด', num(st.students), 'คน', 'ที่มีสถานะกำลังศึกษา') +
+        statCard('📈', 'คะแนนเฉลี่ยทั้งโรงเรียน', st.avgScore, 'คะแนน', 'จากเต็ม 100 คะแนน') +
+        statCard('🌟', 'ความดีเดือนนี้', num(st.monthMerit), 'ครั้ง',
+          st.monthDemerit + ' ครั้งที่ทำผิด · ' + ratioNote) +
+        statCard('🔔', 'นักเรียนต้องช่วยเหลือ', num(st.atRisk), 'คน',
+          'เฝ้าระวังอีก ' + st.watch + ' คน', st.atRisk > 0 ? 'var(--critical)' : null) +
+      '</div>' +
+
+      (st.pending && d.canApprove
+        ? '<div class="card" style="margin-bottom:16px;border-color:var(--warning);background:var(--warn-soft)">' +
+            '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+              '<span style="font-size:22px">⏳</span>' +
+              '<div style="flex:1;min-width:180px"><b>มีบันทึกรอการพิจารณา ' + st.pending + ' รายการ</b>' +
+              '<div class="small muted">บันทึกที่ยังไม่อนุมัติจะยังไม่มีผลต่อคะแนนของนักเรียน</div></div>' +
+              '<button class="btn btn-primary" onclick="go(\'approve\')">ไปพิจารณา</button>' +
+            '</div></div>'
+        : '') +
+
+      '<div class="grid grid-2" style="margin-bottom:16px">' +
+        '<div class="card">' +
+          '<div class="card-head"><h3>แนวโน้ม 6 เดือนล่าสุด</h3>' +
+            '<div class="right"><button class="btn btn-ghost btn-sm" onclick="toggleTrendTable()" ' +
+              'id="trend-toggle">ดูเป็นตาราง</button></div></div>' +
+          '<div id="chart-trend"></div>' +
+          '<div id="trend-table" class="hide" style="margin-top:10px"></div>' +
+          '<p class="small muted" style="margin:10px 0 0">ระบบที่ดีควรมีอัตราส่วนความดีต่อความผิดอย่างน้อย 3 ต่อ 1 ' +
+            'ถ้าต่ำกว่านี้แปลว่าระบบกำลังกลายเป็นเครื่องมือจับผิด</p>' +
+        '</div>' +
+        '<div class="card">' +
+          '<div class="card-head"><h3>การกระจายตามระดับความเสี่ยง</h3></div>' +
+          '<div id="chart-risk"></div>' +
+          '<div class="divider"></div>' +
+          '<div class="card-head"><h3>คะแนนเฉลี่ยรายระดับชั้น</h3></div>' +
+          '<div id="chart-grade"></div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="grid grid-2">' +
+        '<div class="card">' +
+          '<div class="card-head"><h3>พฤติกรรมที่พบบ่อย</h3>' +
+            '<span class="hint">5 อันดับแรกของปีการศึกษานี้</span></div>' +
+          '<div id="chart-violations"></div>' +
+          (d.topViolations.length
+            ? '<p class="small muted" style="margin:12px 0 0">ข้อมูลนี้ใช้วางแผนป้องกันเชิงระบบ ' +
+              'เช่น จัดครูเวรตามจุดและช่วงเวลาที่พบบ่อย ได้ผลกว่าการตามหักคะแนนทีละคน</p>' : '') +
+        '</div>' +
+        '<div class="card">' +
+          '<div class="card-head"><h3>🏅 กระดานเกียรติยศ</h3>' +
+            '<div class="right"><button class="btn btn-ghost btn-sm" onclick="go(\'board\')">ดูทั้งหมด</button></div></div>' +
+          '<div style="font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:4px">มัธยมศึกษาตอนต้น</div>' +
+          rankList(d.leaderboard.lower) +
+          '<div style="font-size:12.5px;font-weight:700;color:var(--muted);margin:14px 0 4px">มัธยมศึกษาตอนปลาย</div>' +
+          rankList(d.leaderboard.upper) +
+        '</div>' +
+      '</div>';
+
+    window._trendData = d.months;
+    registerChart(function () {
+      lineChart('chart-trend', d.months, [
+        { key: 'merit',   label: 'ความดี',  color: 'var(--series-1)' },
+        { key: 'demerit', label: 'ความผิด', color: 'var(--series-2)' }
+      ]);
+    });
+    registerChart(function () {
+      segmentBar('chart-risk', [
+        { label: 'ปกติ',     icon: '●', value: d.risk['ปกติ'] || 0,     color: 'var(--good)' },
+        { label: 'เฝ้าระวัง', icon: '▲', value: d.risk['เฝ้าระวัง'] || 0, color: 'var(--warning)' },
+        { label: 'เสี่ยง',    icon: '▲', value: d.risk['เสี่ยง'] || 0,    color: 'var(--serious)' },
+        { label: 'วิกฤต',    icon: '■', value: d.risk['วิกฤต'] || 0,    color: 'var(--critical)' }
+      ]);
+    });
+    registerChart(function () {
+      barChartV('chart-grade', d.gradeAvg, { min: 60, max: 100, valueLabel: 'คะแนนเฉลี่ย',
+        aria: 'คะแนนเฉลี่ยรายระดับชั้น' });
+    });
+    registerChart(function () { barChartH('chart-violations', d.topViolations); });
+  });
+};
+
+function statCard(icon, label, value, unit, foot, color) {
+  return '<div class="card"><div class="stat">' +
+    '<div class="label"><span class="stat-icon">' + icon + '</span>' + esc(label) + '</div>' +
+    '<div class="value"' + (color ? ' style="color:' + color + '"' : '') + '>' + esc(value) +
+      ' <span class="unit">' + esc(unit) + '</span></div>' +
+    '<div class="foot">' + esc(foot) + '</div>' +
+  '</div></div>';
+}
+
+function rankList(items) {
+  if (!items.length) {
+    return '<div class="empty small" style="padding:16px">ยังไม่มีนักเรียนที่เข้าเกณฑ์ในระดับนี้</div>';
+  }
+  return items.map(function (c) {
+    return '<div class="rank-item">' +
+      '<div class="rank-no rank-' + c.rank + '">' + c.rank + '</div>' +
+      '<div class="rank-name"><b>' + esc(c.displayName) + '</b><span>' + esc(c.classLabel) + '</span></div>' +
+      '<div class="rank-score">' + c.meritTotal + ' <small>คะแนน</small></div>' +
+    '</div>';
+  }).join('');
+}
+
+function toggleTrendTable() {
+  var t = el('trend-table'), c = el('chart-trend'), btn = el('trend-toggle');
+  var showTable = t.classList.contains('hide');
+  if (showTable && !t.innerHTML) {
+    t.innerHTML = '<div class="table-wrap"><table class="data"><thead><tr>' +
+      '<th>เดือน</th><th class="num">ความดี (ครั้ง)</th><th class="num">ความผิด (ครั้ง)</th>' +
+      '</tr></thead><tbody>' +
+      window._trendData.map(function (m) {
+        return '<tr><td>' + esc(m.label) + '</td><td class="num">' + m.merit +
+               '</td><td class="num">' + m.demerit + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  t.classList.toggle('hide', !showTable);
+  c.classList.toggle('hide', showTable);
+  btn.textContent = showTable ? 'ดูเป็นกราฟ' : 'ดูเป็นตาราง';
+}
+
+/* ------------------------------------------------------------------ */
+/* 2. บันทึกพฤติกรรม — หน้าจอที่ต้องเร็วที่สุดในระบบ                        */
+/* ------------------------------------------------------------------ */
+
+var REC = { kind: 'ความดี', student: null, rule: null, rules: null };
+
+VIEWS.record = function (root) {
+  root.innerHTML =
+    '<div class="grid grid-2">' +
+      '<div class="card">' +
+        '<div class="card-head"><h3>บันทึกพฤติกรรมนักเรียน</h3></div>' +
+
+        '<div class="kind-switch">' +
+          '<button class="kind-btn merit on" id="k-merit" onclick="setKind(\'ความดี\')">' +
+            '<span class="emo">🌟</span><span class="txt">ความดี</span>' +
+            '<span class="sub">เพิ่มคะแนน</span></button>' +
+          '<button class="kind-btn demerit" id="k-demerit" onclick="setKind(\'ความผิด\')">' +
+            '<span class="emo">⚠️</span><span class="txt">ความผิด</span>' +
+            '<span class="sub">หักคะแนน</span></button>' +
+        '</div>' +
+
+        '<div class="field"><label>1. เลือกนักเรียน</label>' +
+          '<div id="rec-student"></div></div>' +
+
+        '<div class="field"><label>2. เลือกหลักเกณฑ์</label>' +
+          '<input type="search" id="rule-search" placeholder="พิมพ์ค้นหาเกณฑ์..." ' +
+            'oninput="renderRules()" style="margin-bottom:8px">' +
+          '<div class="pick-list" id="rule-list"></div></div>' +
+
+        '<div class="field"><label for="rec-detail">3. รายละเอียดเหตุการณ์ <span class="muted">(จำเป็น)</span></label>' +
+          '<textarea id="rec-detail" placeholder="เกิดอะไรขึ้น ที่ไหน อย่างไร เขียนตามจริงอย่างเป็นกลาง"></textarea>' +
+          '<div class="help">รายละเอียดที่ดีช่วยให้เห็นสาเหตุเชิงระบบ เช่น มาสายเพราะรถรับส่ง ไม่ใช่เพราะขาดวินัย</div></div>' +
+
+        '<div class="row">' +
+          '<div class="field"><label for="rec-place">สถานที่</label>' +
+            '<input type="text" id="rec-place" placeholder="เช่น หน้าเสาธง โรงอาหาร"></div>' +
+          '<div class="field"><label for="rec-when">วันเวลาที่เกิดเหตุ</label>' +
+            '<input type="datetime-local" id="rec-when"></div>' +
+        '</div>' +
+
+        '<div class="field hide" id="evidence-field"><label for="rec-evidence">ลิงก์หลักฐาน ' +
+          '<span class="muted">(เกณฑ์นี้บังคับ)</span></label>' +
+          '<input type="text" id="rec-evidence" placeholder="วางลิงก์รูปภาพจาก Google Drive หรือ Google Photos">' +
+          '<div class="help">อัปโหลดไฟล์ขึ้น Google Drive ของโรงเรียนแล้วนำลิงก์มาวาง</div></div>' +
+
+        '<button class="btn btn-primary btn-block" id="rec-submit" onclick="submitRecord(this)" ' +
+          'style="margin-top:6px">บันทึกและส่งให้พิจารณา</button>' +
+        '<p class="small muted" style="margin-top:10px">บันทึกจะมีผลต่อคะแนนเมื่อผู้มีอำนาจอนุมัติแล้วเท่านั้น</p>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<div class="card-head"><h3>บันทึกล่าสุดของฉัน</h3>' +
+          '<div class="right"><button class="btn btn-ghost btn-sm" onclick="loadMyRecords()">รีเฟรช</button></div></div>' +
+        '<div id="my-records"><div class="skeleton" style="height:120px"></div></div>' +
+      '</div>' +
+    '</div>';
+
+  var now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  el('rec-when').value = now.toISOString().slice(0, 16);
+
+  REC.student = null; REC.rule = null;
+  renderStudentPicker();
+  loadMyRecords();
+
+  return call('apiListRules', [S.token]).then(function (rules) {
+    REC.rules = rules;
+    renderRules();
+  });
+};
+
+function setKind(kind) {
+  REC.kind = kind;
+  REC.rule = null;
+  el('k-merit').classList.toggle('on', kind === 'ความดี');
+  el('k-demerit').classList.toggle('on', kind === 'ความผิด');
+  el('evidence-field').classList.add('hide');
+  renderRules();
+}
+
+function renderRules() {
+  if (!REC.rules) return;
+  var q = (el('rule-search').value || '').trim().toLowerCase();
+  var list = REC.rules.filter(function (r) {
+    if (r.kind !== REC.kind) return false;
+    if (!q) return true;
+    return (r.code + ' ' + r.name + ' ' + r.category).toLowerCase().indexOf(q) >= 0;
+  });
+
+  el('rule-list').innerHTML = list.length ? list.map(function (r) {
+    var sev = r.severity ? ['', 'เบา', 'ปานกลาง', 'ร้ายแรง', 'ร้ายแรงมาก'][r.severity] : '';
+    return '<div class="pick-item' + (REC.rule && REC.rule.id === r.id ? ' on' : '') +
+      '" onclick="pickRule(' + r.id + ')">' +
+      '<div class="grow"><b>' + esc(r.name) + '</b>' +
+        '<span>' + esc(r.code) + ' · ' + esc(r.category) + (sev ? ' · ระดับ' + sev : '') +
+        (r.requiresEvidence ? ' · ต้องมีหลักฐาน' : '') + '</span></div>' +
+      '<div class="pick-pts" style="color:' + (r.kind === 'ความดี' ? 'var(--series-1)' : 'var(--series-2)') + '">' +
+        (r.kind === 'ความดี' ? '+' : '−') + r.points + '</div>' +
+    '</div>';
+  }).join('') : '<div class="empty small">ไม่พบหลักเกณฑ์ที่ค้นหา</div>';
+}
+
+function pickRule(id) {
+  REC.rule = REC.rules.filter(function (r) { return r.id === id; })[0];
+  el('evidence-field').classList.toggle('hide', !REC.rule.requiresEvidence);
+  renderRules();
+}
+
+function renderStudentPicker() {
+  el('rec-student').innerHTML = REC.student
+    ? '<div class="pick-item on" onclick="openStudentPicker()" style="border-radius:10px;border:1px solid var(--line)">' +
+        '<div class="avatar">' + esc(initials(REC.student.name)) + '</div>' +
+        '<div class="grow"><b>' + esc(REC.student.name) + '</b>' +
+        '<span>' + esc(REC.student.classLabel) + ' · รหัส ' + esc(REC.student.code) +
+        ' · คะแนน ' + REC.student.conductScore + '</span></div>' +
+        '<span class="btn btn-ghost btn-sm">เปลี่ยน</span></div>'
+    : '<button class="btn btn-block" onclick="openStudentPicker()" style="justify-content:flex-start">' +
+        '🔍 ค้นหาชื่อหรือรหัสนักเรียน</button>';
+}
+
+function openStudentPicker() {
+  openModal('เลือกนักเรียน',
+    '<input type="search" id="sp-q" placeholder="พิมพ์ชื่อ นามสกุล รหัส หรือห้อง เช่น ม.1/1" ' +
+      'autocomplete="off" style="margin-bottom:10px">' +
+    '<div id="sp-list"><div class="empty small">พิมพ์อย่างน้อย 1 ตัวอักษรเพื่อค้นหา</div></div>');
+
+  var input = el('sp-q');
+  var timer;
+  input.oninput = function () {
+    clearTimeout(timer);
+    var q = input.value.trim();
+    if (!q) { el('sp-list').innerHTML = '<div class="empty small">พิมพ์อย่างน้อย 1 ตัวอักษรเพื่อค้นหา</div>'; return; }
+    el('sp-list').innerHTML = '<div class="skeleton" style="height:60px"></div>';
+    timer = setTimeout(function () {
+      call('apiSearchStudents', [S.token, q, { limit: 25 }]).then(function (list) {
+        el('sp-list').innerHTML = list.length
+          ? '<div class="pick-list">' + list.map(function (s) {
+              return '<div class="pick-item" onclick="chooseStudent(' + s.id + ')">' +
+                '<div class="avatar">' + esc(initials(s.name)) + '</div>' +
+                '<div class="grow"><b>' + esc(s.name) + '</b><span>' + esc(s.classLabel) +
+                  ' · เลขที่ ' + esc(s.seat) + ' · รหัส ' + esc(s.code) + '</span></div>' +
+                '<div class="pick-pts" style="color:' + scoreColor(s.conductScore) + '">' + s.conductScore + '</div>' +
+              '</div>';
+            }).join('') + '</div>'
+          : '<div class="empty small">ไม่พบนักเรียนที่ค้นหา</div>';
+        window._spList = list;
+      }).catch(function (e) {
+        el('sp-list').innerHTML = '<div class="alert alert-error">' + esc(e.message) + '</div>';
+      });
+    }, 280);
+  };
+  setTimeout(function () { input.focus(); }, 80);
+}
+
+function chooseStudent(id) {
+  REC.student = (window._spList || []).filter(function (s) { return s.id === id; })[0];
+  closeModal();
+  renderStudentPicker();
+}
+
+function submitRecord(btn) {
+  if (!REC.student) { toast('กรุณาเลือกนักเรียนก่อน', 'err'); return; }
+  if (!REC.rule) { toast('กรุณาเลือกหลักเกณฑ์', 'err'); return; }
+  var detail = el('rec-detail').value.trim();
+  if (!detail) { toast('กรุณากรอกรายละเอียดเหตุการณ์', 'err'); el('rec-detail').focus(); return; }
+
+  var when = el('rec-when').value;
+  busy(btn, true);
+  call('apiCreateRecord', [S.token, {
+    studentId: REC.student.id,
+    ruleId: REC.rule.id,
+    detail: detail,
+    location: el('rec-place').value.trim(),
+    occurredAt: when ? when.replace('T', ' ') + ':00' : '',
+    evidenceUrl: el('rec-evidence') ? el('rec-evidence').value.trim() : ''
+  }]).then(function (res) {
+    busy(btn, false, 'บันทึกและส่งให้พิจารณา');
+    toast('บันทึก ' + res.recordNo + ' ส่งให้พิจารณาแล้ว', 'ok');
+    REC.student = null; REC.rule = null;
+    el('rec-detail').value = ''; el('rec-place').value = '';
+    if (el('rec-evidence')) el('rec-evidence').value = '';
+    el('evidence-field').classList.add('hide');
+    renderStudentPicker();
+    renderRules();
+    loadMyRecords();
+  }).catch(function (e) {
+    busy(btn, false, 'บันทึกและส่งให้พิจารณา');
+    toast(e.message, 'err');
+  });
+}
+
+function loadMyRecords() {
+  var box = el('my-records');
+  if (!box) return;
+  call('apiMyRecords', [S.token, 20]).then(function (list) {
+    box.innerHTML = list.length
+      ? '<div class="table-wrap"><table class="data"><thead><tr>' +
+          '<th>นักเรียน</th><th>เกณฑ์</th><th class="num">คะแนน</th><th>สถานะ</th></tr></thead><tbody>' +
+        list.map(function (r) {
+          return '<tr><td><b>' + esc(r.studentName) + '</b><div class="small muted">' + esc(r.classLabel) +
+            ' · ' + esc(r.occurredThai) + '</div></td>' +
+            '<td>' + esc(r.ruleName) + '</td>' +
+            '<td class="num" style="color:' + (r.kind === 'ความดี' ? 'var(--series-1)' : 'var(--series-2)') +
+              ';font-weight:700">' + (r.kind === 'ความดี' ? '+' : '−') + r.points + '</td>' +
+            '<td>' + statusBadge(r.status) +
+              (r.reviewNote ? '<div class="small muted">' + esc(r.reviewNote) + '</div>' : '') + '</td></tr>';
+        }).join('') + '</tbody></table></div>'
+      : '<div class="empty"><div class="big">📝</div>ยังไม่มีบันทึกของคุณ</div>';
+  }).catch(function (e) {
+    box.innerHTML = '<div class="alert alert-error">' + esc(e.message) + '</div>';
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* 3. รออนุมัติ                                                        */
+/* ------------------------------------------------------------------ */
+
+VIEWS.approve = function (root) {
+  return call('apiPendingRecords', [S.token]).then(function (list) {
+    updatePendingBadge(list.length);
+    if (!list.length) {
+      root.innerHTML = '<div class="card"><div class="empty"><div class="big">🎉</div>' +
+        '<b>ไม่มีบันทึกค้างพิจารณา</b><div class="small">บันทึกที่ส่งเข้ามาใหม่จะแสดงที่นี่</div></div></div>';
+      return;
+    }
+
+    root.innerHTML =
+      '<div class="card" style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+        '<span style="font-size:20px">⏳</span>' +
+        '<div style="flex:1;min-width:200px"><b>รอพิจารณา ' + list.length + ' รายการ</b>' +
+        '<div class="small muted">บันทึกจะมีผลต่อคะแนนนักเรียนเมื่ออนุมัติแล้วเท่านั้น ' +
+        'ความผิดระดับร้ายแรงต้องให้ฝ่ายกิจการนักเรียนพิจารณา</div></div></div></div>' +
+      '<div class="grid" style="gap:12px">' + list.map(pendingCard).join('') + '</div>';
+  });
+};
+
+function pendingCard(r) {
+  var isMerit = r.kind === 'ความดี';
+  var sevText = r.severity ? ['', 'เบา', 'ปานกลาง', 'ร้ายแรง', 'ร้ายแรงมาก'][r.severity] : '';
+  return '<div class="card" id="pc-' + r.id + '">' +
+    '<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">' +
+      '<div class="avatar" style="width:42px;height:42px;flex:0 0 42px;font-size:16px">' +
+        esc(initials(r.studentName)) + '</div>' +
+      '<div style="flex:1;min-width:200px">' +
+        '<b style="font-size:15.5px">' + esc(r.studentName) + '</b>' +
+        '<div class="small muted">' + esc(r.classLabel) + ' · รหัส ' + esc(r.studentCode) + '</div>' +
+      '</div>' +
+      '<div style="text-align:right">' +
+        '<span class="badge ' + (isMerit ? 'badge-merit' : 'badge-demerit') + '">' +
+          (isMerit ? '🌟 ' : '⚠️ ') + esc(r.kind) + '</span>' +
+        '<div style="font-size:21px;font-weight:700;color:' +
+          (isMerit ? 'var(--series-1)' : 'var(--series-2)') + '">' +
+          (isMerit ? '+' : '−') + r.points + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="divider" style="margin:12px 0"></div>' +
+    '<div style="font-size:14.5px;font-weight:600;margin-bottom:3px">' + esc(r.ruleCode) + ' ' + esc(r.ruleName) +
+      (sevText ? ' <span class="badge">ระดับ' + esc(sevText) + '</span>' : '') + '</div>' +
+    '<p style="font-size:14px;margin:6px 0">' + esc(r.detail) + '</p>' +
+    '<div class="small muted">' + esc(r.occurredThai) +
+      (r.location ? ' · ' + esc(r.location) : '') + ' · บันทึกโดย ' + esc(r.reportedBy) + '</div>' +
+    (r.evidenceUrl ? '<div style="margin-top:8px"><a href="' + esc(r.evidenceUrl) +
+      '" target="_blank" rel="noopener" class="btn btn-sm">📎 เปิดดูหลักฐาน</a></div>' : '') +
+    (r.canDecide
+      ? '<div style="display:flex;gap:9px;margin-top:14px;flex-wrap:wrap">' +
+          '<button class="btn btn-good" style="flex:1" onclick="decide(' + r.id + ',\'approve\',this)">✓ อนุมัติ</button>' +
+          '<button class="btn" style="flex:1" onclick="openReject(' + r.id + ')">✕ ไม่อนุมัติ</button>' +
+        '</div>'
+      : '<div class="alert alert-warn" style="margin:14px 0 0">⚠ ความผิดระดับร้ายแรง ' +
+        'ต้องให้ฝ่ายกิจการนักเรียนเป็นผู้พิจารณา</div>') +
+  '</div>';
+}
+
+function decide(id, decision, btn, note) {
+  busy(btn, true);
+  call('apiReviewRecord', [S.token, id, decision, note || ''])
+    .then(function () {
+      var card = el('pc-' + id);
+      if (card) {
+        card.style.transition = 'opacity .25s, transform .25s';
+        card.style.opacity = '0'; card.style.transform = 'scale(.97)';
+        setTimeout(function () { card.remove(); }, 260);
+      }
+      updatePendingBadge(Math.max(0, S.pendingCount - 1));
+      toast(decision === 'approve' ? 'อนุมัติแล้ว คะแนนได้รับการปรับปรุง' : 'บันทึกไม่ได้รับอนุมัติ', 'ok');
+    })
+    .catch(function (e) { busy(btn, false); toast(e.message, 'err'); });
+}
+
+function openReject(id) {
+  openModal('ไม่อนุมัติบันทึก',
+    '<div class="field"><label>เหตุผล <span class="muted">(ผู้บันทึกจะเห็นข้อความนี้)</span></label>' +
+    '<textarea id="rj-note" placeholder="เช่น ข้อมูลไม่เพียงพอ ควรระบุพยานหรือแนบหลักฐาน"></textarea></div>',
+    '<button class="btn" onclick="closeModal()">ยกเลิก</button>' +
+    '<button class="btn btn-danger" id="rj-ok">ไม่อนุมัติ</button>');
+  el('rj-ok').onclick = function () {
+    var note = el('rj-note').value.trim();
+    if (!note) { toast('กรุณาระบุเหตุผล', 'err'); return; }
+    closeModal();
+    decide(id, 'reject', null, note);
+  };
+}
+</script>
+
+<script>
+/* ------------------------------------------------------------------ */
+/* 4. นักเรียน                                                         */
+/* ------------------------------------------------------------------ */
+
+var STU = { grade: '', room: '', q: '' };
+
+VIEWS.students = function (root) {
+  root.innerHTML =
+    '<div class="card" style="margin-bottom:14px">' +
+      '<div class="row" style="align-items:flex-end">' +
+        '<div class="field" style="flex:2;margin-bottom:0"><label>ค้นหา</label>' +
+          '<input type="search" id="stu-q" placeholder="ชื่อ นามสกุล หรือรหัสนักเรียน" value="' + esc(STU.q) + '"></div>' +
+        '<div class="field" style="flex:1;margin-bottom:0"><label>ระดับชั้น</label>' +
+          '<select id="stu-grade"><option value="">ทุกระดับ</option>' +
+            [1,2,3,4,5,6].map(function (g) {
+              return '<option value="' + g + '"' + (String(STU.grade) === String(g) ? ' selected' : '') +
+                     '>ม.' + g + '</option>';
+            }).join('') + '</select></div>' +
+        '<div class="field" style="flex:1;margin-bottom:0"><label>ห้อง</label>' +
+          '<input type="number" id="stu-room" min="1" placeholder="ทุกห้อง" value="' + esc(STU.room) + '"></div>' +
+        '<button class="btn btn-primary" onclick="loadStudents()" style="flex:0 0 auto">ค้นหา</button>' +
+        (S.perm['student.manage']
+          ? '<button class="btn" onclick="openStudentForm()" style="flex:0 0 auto">+ เพิ่มนักเรียน</button>' : '') +
+      '</div>' +
+    '</div>' +
+    '<div class="card"><div id="stu-result"><div class="skeleton" style="height:200px"></div></div></div>';
+
+  ['stu-q'].forEach(function (id) {
+    el(id).addEventListener('keydown', function (e) { if (e.key === 'Enter') loadStudents(); });
+  });
+  return loadStudents();
+};
+
+function loadStudents() {
+  STU.q = el('stu-q').value.trim();
+  STU.grade = el('stu-grade').value;
+  STU.room = el('stu-room').value;
+  var box = el('stu-result');
+  box.innerHTML = '<div class="skeleton" style="height:200px"></div>';
+
+  return call('apiSearchStudents', [S.token, STU.q, { grade: STU.grade, room: STU.room, limit: 400 }])
+    .then(function (list) {
+      if (!list.length) {
+        box.innerHTML = '<div class="empty"><div class="big">🔍</div>ไม่พบนักเรียนตามเงื่อนไขที่ค้นหา</div>';
+        return;
+      }
+      box.innerHTML =
+        '<div class="card-head"><h3>พบ ' + list.length + ' คน</h3>' +
+          '<span class="hint">แตะที่แถวเพื่อดูประวัติรายบุคคล</span></div>' +
+        '<div class="table-wrap"><table class="data"><thead><tr>' +
+          '<th>นักเรียน</th><th>ห้อง</th><th class="num">คะแนนความประพฤติ</th>' +
+          '<th class="num">ความดีสะสม</th><th class="num">ครั้งที่ทำผิด</th><th>ระดับ</th>' +
+        '</tr></thead><tbody>' +
+        list.map(function (s) {
+          return '<tr class="clickable" onclick="openStudent(' + s.id + ')">' +
+            '<td><b>' + esc(s.name) + '</b><div class="small muted">รหัส ' + esc(s.code) +
+              ' · เลขที่ ' + esc(s.seat) + '</div></td>' +
+            '<td>' + esc(s.classLabel) + '</td>' +
+            '<td class="num"><b style="color:' + scoreColor(s.conductScore) + '">' + s.conductScore + '</b></td>' +
+            '<td class="num">' + s.meritTotal + '</td>' +
+            '<td class="num">' + (s.demeritCount || '—') + '</td>' +
+            '<td>' + riskBadge(s.riskLevel) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    });
+}
+
+function openStudent(id) {
+  openModal('ประวัติความประพฤติ', '<div class="skeleton" style="height:260px"></div>');
+  call('apiGetStudent', [S.token, id]).then(function (d) {
+    var s = d.student, b = d.balance;
+    openModal(s.name,
+      '<div style="display:flex;gap:14px;align-items:center;margin-bottom:16px;flex-wrap:wrap">' +
+        '<div class="avatar" style="width:52px;height:52px;flex:0 0 52px;font-size:20px">' +
+          esc(initials(s.name)) + '</div>' +
+        '<div style="flex:1;min-width:150px"><b style="font-size:16px">' + esc(s.name) + '</b>' +
+          '<div class="small muted">' + esc(s.classLabel) + ' · เลขที่ ' + esc(s.seat) +
+          ' · รหัส ' + esc(s.code) + '</div></div>' +
+        '<div style="text-align:right"><div style="font-size:30px;font-weight:700;color:' +
+          scoreColor(b.conductScore) + '">' + b.conductScore + '</div>' +
+          '<div class="small muted">คะแนนความประพฤติ</div></div>' +
+      '</div>' +
+
+      '<div style="margin-bottom:6px">' + riskBadge(b.riskLevel) + '</div>' +
+      (b.riskAction && b.riskLevel !== 'ปกติ'
+        ? '<div class="alert alert-warn" style="margin-bottom:14px">⚠ การดำเนินการที่ต้องทำ: ' +
+          esc(b.riskAction) + '</div>' : '') +
+
+      '<div class="grid grid-3" style="gap:10px;margin-bottom:16px">' +
+        miniStat('ความดีสะสม', b.meritTotal, b.meritCount + ' ครั้ง', 'var(--series-1)') +
+        miniStat('คะแนนที่ถูกหัก', b.demeritTotal, b.demeritCount + ' ครั้ง', 'var(--series-2)') +
+        miniStat('ยินยอมเผยแพร่', s.publishConsent ? 'ยินยอม' : 'ไม่ยินยอม',
+          s.publishConsent ? 'แสดงชื่อเต็มได้' : 'ระบบจะปกปิดนามสกุล', 'var(--ink-2)') +
+      '</div>' +
+
+      '<div class="card-head"><h3>แนวโน้มคะแนนปีการศึกษานี้</h3></div>' +
+      '<div id="stu-spark" style="margin-bottom:16px"></div>' +
+
+      '<div class="card-head"><h3>ประวัติทั้งหมด</h3>' +
+        '<span class="hint">' + d.history.length + ' รายการ</span></div>' +
+      (d.history.length
+        ? '<div class="table-wrap"><table class="data"><thead><tr><th>วันที่</th><th>รายการ</th>' +
+          '<th class="num">คะแนน</th><th>สถานะ</th></tr></thead><tbody>' +
+          d.history.map(function (h) {
+            return '<tr><td class="small">' + esc(h.occurredThai) + '</td>' +
+              '<td><b>' + esc(h.ruleName) + '</b><div class="small muted">' + esc(h.detail) +
+                '<br>โดย ' + esc(h.reportedBy) + '</div></td>' +
+              '<td class="num" style="font-weight:700;color:' +
+                (h.kind === 'ความดี' ? 'var(--series-1)' : 'var(--series-2)') + '">' +
+                (h.kind === 'ความดี' ? '+' : '−') + h.points + '</td>' +
+              '<td>' + statusBadge(h.status) +
+                (S.perm['record.revoke'] && h.status === 'อนุมัติแล้ว'
+                  ? '<div><button class="btn btn-ghost btn-sm" onclick="openRevoke(' + h.id + ',' + id +
+                    ')">เพิกถอน</button></div>' : '') + '</td></tr>';
+          }).join('') + '</tbody></table></div>'
+        : '<div class="empty small">ยังไม่มีประวัติในระบบ</div>'),
+
+      (S.perm['report.view']
+        ? '<button class="btn" onclick="closeModal();exportStudentReport(' + id + ')">📄 ออกรายงานรายบุคคล</button>' : '') +
+      (S.perm['student.manage']
+        ? '<button class="btn" onclick=\'openStudentForm(' + JSON.stringify(s).replace(/'/g, '&#39;') +
+          ')\'>✏️ แก้ไขข้อมูล</button>' : '') +
+      '<button class="btn btn-primary" onclick="closeModal()">ปิด</button>');
+
+    sparkScore('stu-spark', d.timeline, 100);
+  }).catch(function (e) {
+    openModal('เกิดข้อผิดพลาด', '<div class="alert alert-error">⚠ ' + esc(e.message) + '</div>',
+      '<button class="btn" onclick="closeModal()">ปิด</button>');
+  });
+}
+
+function miniStat(label, value, foot, color) {
+  return '<div style="background:var(--surface-2);border-radius:10px;padding:10px 12px">' +
+    '<div class="small muted">' + esc(label) + '</div>' +
+    '<div style="font-size:19px;font-weight:700;color:' + color + '">' + esc(value) + '</div>' +
+    '<div class="small muted">' + esc(foot) + '</div></div>';
+}
+
+function openRevoke(recordId, studentId) {
+  openModal('เพิกถอนบันทึก',
+    '<div class="alert alert-warn">⚠ การเพิกถอนจะคืนคะแนนให้นักเรียนทันที ' +
+      'และมีการบันทึกร่องรอยไว้ตรวจสอบได้</div>' +
+    '<div class="field"><label>เหตุผลในการเพิกถอน</label>' +
+    '<textarea id="rv-note" placeholder="เช่น อุทธรณ์สำเร็จ พบว่าบันทึกผิดตัว"></textarea></div>',
+    '<button class="btn" onclick="closeModal()">ยกเลิก</button>' +
+    '<button class="btn btn-danger" id="rv-ok">เพิกถอน</button>');
+  el('rv-ok').onclick = function () {
+    var note = el('rv-note').value.trim();
+    if (!note) { toast('กรุณาระบุเหตุผล', 'err'); return; }
+    var btn = this; busy(btn, true);
+    call('apiRevokeRecord', [S.token, recordId, note]).then(function () {
+      closeModal();
+      toast('เพิกถอนบันทึกและคืนคะแนนแล้ว', 'ok');
+      openStudent(studentId);
+    }).catch(function (e) { busy(btn, false, 'เพิกถอน'); toast(e.message, 'err'); });
+  };
+}
+
+function openStudentForm(s) {
+  s = s || {};
+  openModal(s.id ? 'แก้ไขข้อมูลนักเรียน' : 'เพิ่มนักเรียน',
+    '<div class="row"><div class="field"><label>รหัสประจำตัวนักเรียน</label>' +
+      '<input id="sf-code" type="text" value="' + esc(s.code || '') + '"></div>' +
+      '<div class="field"><label>คำนำหน้า</label><input id="sf-prefix" type="text" value="' +
+        esc(s.prefix || '') + '" placeholder="เด็กชาย / นางสาว"></div></div>' +
+    '<div class="row"><div class="field"><label>ชื่อ</label><input id="sf-first" type="text" value="' +
+      esc(s.firstName || '') + '"></div>' +
+      '<div class="field"><label>นามสกุล</label><input id="sf-last" type="text" value="' +
+        esc(s.lastName || '') + '"></div></div>' +
+    '<div class="row"><div class="field"><label>ระดับชั้น</label><select id="sf-grade">' +
+      [1,2,3,4,5,6].map(function (g) {
+        return '<option value="' + g + '"' + (Number(s.grade) === g ? ' selected' : '') + '>ม.' + g + '</option>';
+      }).join('') + '</select></div>' +
+      '<div class="field"><label>ห้อง</label><input id="sf-room" type="number" min="1" value="' +
+        esc(s.room || 1) + '"></div>' +
+      '<div class="field"><label>เลขที่</label><input id="sf-seat" type="number" min="1" value="' +
+        esc(s.seat || '') + '"></div></div>' +
+    '<div class="row"><div class="field"><label>ชื่อผู้ปกครอง</label><input id="sf-gname" type="text" value="' +
+      esc(s.guardianName || '') + '"></div>' +
+      '<div class="field"><label>โทรศัพท์ผู้ปกครอง</label><input id="sf-gphone" type="text" value="' +
+        esc(s.guardianPhone || '') + '"></div></div>' +
+    '<div class="field"><label style="display:flex;gap:9px;align-items:flex-start;font-weight:400">' +
+      '<input type="checkbox" id="sf-consent" style="width:auto;min-height:0;margin-top:3px"' +
+        (s.publishConsent ? ' checked' : '') + '>' +
+      '<span>ผู้ปกครองยินยอมให้เผยแพร่ชื่อ-สกุลบนกระดานเกียรติยศสาธารณะ (ตาม PDPA)<br>' +
+      '<span class="small muted">ถ้าไม่ติ๊ก ระบบจะแสดงเป็น "ธนา ข." โดยอัตโนมัติ</span></span></label></div>' +
+    '<div id="sf-error"></div>',
+    '<button class="btn" onclick="closeModal()">ยกเลิก</button>' +
+    '<button class="btn btn-primary" id="sf-save">บันทึก</button>');
+
+  el('sf-save').onclick = function () {
+    var btn = this; busy(btn, true);
+    call('apiSaveStudent', [S.token, {
+      id: s.id || null, code: el('sf-code').value, prefix: el('sf-prefix').value,
+      firstName: el('sf-first').value, lastName: el('sf-last').value,
+      grade: el('sf-grade').value, room: el('sf-room').value, seat: el('sf-seat').value,
+      guardianName: el('sf-gname').value, guardianPhone: el('sf-gphone').value,
+      publishConsent: el('sf-consent').checked
+    }]).then(function () {
+      closeModal(); toast('บันทึกข้อมูลนักเรียนเรียบร้อย', 'ok');
+      if (S.view === 'students') loadStudents();
+    }).catch(function (e) {
+      busy(btn, false, 'บันทึก');
+      el('sf-error').innerHTML = '<div class="alert alert-error">⚠ ' + esc(e.message) + '</div>';
+    });
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* 5. กระดานเกียรติยศ                                                   */
+/* ------------------------------------------------------------------ */
+
+VIEWS.board = function (root) {
+  return call('apiLeaderboard', [S.token]).then(function (d) {
+    root.innerHTML =
+      '<div class="card" style="margin-bottom:16px">' +
+        '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">' +
+          '<span style="font-size:26px">🏅</span>' +
+          '<div style="flex:1;min-width:220px"><b>นักเรียนคะแนนความดีสูงสุด</b>' +
+            '<div class="small muted">เงื่อนไข: ไม่เคยมีบันทึกความผิดที่อนุมัติแล้ว ' +
+            'คะแนนความประพฤติเต็ม 100 และมีคะแนนความดีอย่างน้อย 1 คะแนน</div></div>' +
+          (S.perm['leaderboard.publish']
+            ? '<button class="btn btn-primary" onclick="doPublishBoard(this)">📢 ประกาศขึ้นหน้าเว็บ</button>' : '') +
+        '</div>' +
+        (d.publishedAtThai
+          ? '<div class="small muted" style="margin-top:10px">ประกาศบนหน้าเว็บสาธารณะล่าสุดเมื่อ ' +
+            esc(d.publishedAtThai) + '</div>'
+          : '<div class="alert alert-warn" style="margin:10px 0 0">⚠ ยังไม่เคยประกาศขึ้นหน้าเว็บสาธารณะ</div>') +
+      '</div>' +
+
+      '<div class="grid grid-2">' +
+        boardCard('มัธยมศึกษาตอนต้น (ม.1–3)', d.lower) +
+        boardCard('มัธยมศึกษาตอนปลาย (ม.4–6)', d.upper) +
+      '</div>';
+  });
+};
+
+function boardCard(title, items) {
+  return '<div class="card"><div class="card-head"><h3>' + esc(title) + '</h3>' +
+    '<span class="hint">' + items.length + ' คน</span></div>' +
+    (items.length
+      ? items.map(function (c) {
+          return '<div class="rank-item">' +
+            '<div class="rank-no rank-' + c.rank + '">' + c.rank + '</div>' +
+            '<div class="rank-name"><b>' + esc(c.displayName) + '</b>' +
+              '<span>' + esc(c.classLabel) + ' · ทำความดี ' + c.meritCount + ' ครั้ง</span></div>' +
+            '<div class="rank-score">' + c.meritTotal + ' <small>คะแนน</small></div></div>';
+        }).join('')
+      : '<div class="empty"><div class="big">🌱</div>ยังไม่มีนักเรียนที่เข้าเกณฑ์ในระดับนี้' +
+        '<div class="small" style="margin-top:6px">เริ่มบันทึกความดีให้นักเรียนได้เลย</div></div>') +
+  '</div>';
+}
+
+function doPublishBoard(btn) {
+  confirmAction('ประกาศกระดานเกียรติยศ',
+    'ระบบจะบันทึกอันดับ ณ ขณะนี้ขึ้นหน้าเว็บสาธารณะ ' +
+    'ชื่อนักเรียนที่ผู้ปกครองไม่ได้ให้ความยินยอมจะถูกปกปิดนามสกุลโดยอัตโนมัติ',
+    function () {
+      busy(btn, true);
+      call('apiPublishLeaderboard', [S.token]).then(function (r) {
+        busy(btn, false, '📢 ประกาศขึ้นหน้าเว็บ');
+        toast('ประกาศเรียบร้อย ' + r.count + ' รายการ', 'ok');
+        go('board');
+      }).catch(function (e) { busy(btn, false, '📢 ประกาศขึ้นหน้าเว็บ'); toast(e.message, 'err'); });
+    });
+}
+
+/* ------------------------------------------------------------------ */
+/* 6. รายงาน                                                           */
+/* ------------------------------------------------------------------ */
+
+var RPT = { id: 'R05', params: {}, current: null };
+
+VIEWS.reports = function (root) {
+  return call('apiListReports', [S.token]).then(function (list) {
+    root.innerHTML =
+      '<div class="card" style="margin-bottom:14px">' +
+        '<div class="card-head"><h3>เลือกรายงาน</h3>' +
+          '<span class="hint">ออกได้ทั้งไฟล์ Excel และ PDF</span></div>' +
+        '<div class="chips" style="margin-bottom:14px">' +
+          list.map(function (r) {
+            return '<button class="chip' + (RPT.id === r.id ? ' on' : '') +
+              '" data-rpt="' + r.id + '" onclick="pickReport(\'' + r.id + '\')">' +
+              esc(r.id) + ' ' + esc(r.name) + '</button>';
+          }).join('') +
+        '</div>' +
+        '<div id="rpt-params"></div>' +
+        '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:6px">' +
+          '<button class="btn btn-primary" onclick="runReport(this)">👁 แสดงตัวอย่าง</button>' +
+          '<button class="btn" onclick="downloadReport(\'xlsx\',this)">📊 ดาวน์โหลด Excel</button>' +
+          '<button class="btn" onclick="downloadReport(\'pdf\',this)">📄 ดาวน์โหลด PDF</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="rpt-result"></div>';
+
+    window._reportList = list;
+    renderReportParams();
+  });
+};
+
+function pickReport(id) {
+  RPT.id = id;
+  $$('[data-rpt]').forEach(function (c) { c.classList.toggle('on', c.getAttribute('data-rpt') === id); });
+  renderReportParams();
+  el('rpt-result').innerHTML = '';
+}
+
+function renderReportParams() {
+  var meta = (window._reportList || []).filter(function (r) { return r.id === RPT.id; })[0];
+  var box = el('rpt-params');
+  if (!meta || !meta.needs.length) {
+    box.innerHTML = RPT.id === 'R03'
+      ? '<div class="field" style="max-width:260px"><label>แสดงนักเรียนที่คะแนนไม่เกิน</label>' +
+        '<input type="number" id="rp-cutoff" value="70" min="1" max="100"></div>'
+      : '';
+    return;
+  }
+  if (meta.needs.indexOf('student') >= 0) {
+    box.innerHTML = '<div class="field"><label>เลือกนักเรียน</label>' +
+      '<div id="rp-student"><button class="btn" onclick="pickReportStudent()">🔍 ค้นหานักเรียน</button></div></div>';
+  } else if (meta.needs.indexOf('class') >= 0) {
+    box.innerHTML = '<div class="row" style="max-width:420px">' +
+      '<div class="field"><label>ระดับชั้น</label><select id="rp-grade">' +
+        [1,2,3,4,5,6].map(function (g) { return '<option value="' + g + '">ม.' + g + '</option>'; }).join('') +
+      '</select></div>' +
+      '<div class="field"><label>ห้อง</label><input type="number" id="rp-room" min="1" value="1"></div></div>';
+  }
+}
+
+function pickReportStudent() {
+  openStudentPicker();
+  window.chooseStudent = function (id) {
+    var s = (window._spList || []).filter(function (x) { return x.id === id; })[0];
+    RPT.params.studentId = id;
+    closeModal();
+    el('rp-student').innerHTML =
+      '<div class="pick-item on" style="border-radius:10px;border:1px solid var(--line)" ' +
+        'onclick="pickReportStudent()"><div class="avatar">' + esc(initials(s.name)) + '</div>' +
+        '<div class="grow"><b>' + esc(s.name) + '</b><span>' + esc(s.classLabel) + '</span></div>' +
+        '<span class="btn btn-ghost btn-sm">เปลี่ยน</span></div>';
+  };
+}
+
+function collectReportParams() {
+  var p = {};
+  if (el('rp-cutoff')) p.cutoff = el('rp-cutoff').value;
+  if (el('rp-grade')) { p.grade = el('rp-grade').value; p.room = el('rp-room').value; }
+  if (RPT.params.studentId) p.studentId = RPT.params.studentId;
+  return p;
+}
+
+function runReport(btn) {
+  busy(btn, true);
+  call('apiBuildReport', [S.token, RPT.id, collectReportParams()])
+    .then(function (r) {
+      busy(btn, false, '👁 แสดงตัวอย่าง');
+      RPT.current = r;
+      el('rpt-result').innerHTML =
+        '<div class="card">' +
+          '<div class="card-head"><div><h3>' + esc(r.title) + '</h3>' +
+            '<div class="small muted">' + esc(r.subtitle || '') + '</div></div>' +
+            '<div class="right"><span class="badge">' + r.rowCount + ' แถว</span></div></div>' +
+          (r.notes || []).map(function (n) {
+            return '<div class="alert alert-info">' + esc(n) + '</div>';
+          }).join('') +
+          '<div class="table-wrap"><table class="data"><thead><tr>' +
+            r.columns.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') +
+          '</tr></thead><tbody>' +
+            r.rows.map(function (row) {
+              return '<tr>' + row.map(function (cell, i) {
+                var isNum = typeof cell === 'number';
+                return '<td' + (isNum ? ' class="num"' : '') + '>' + esc(cell) + '</td>';
+              }).join('') + '</tr>';
+            }).join('') +
+          '</tbody></table></div>' +
+          '<div class="small muted" style="margin-top:12px">ออกรายงานเมื่อ ' + esc(r.generatedAt) +
+            ' โดย ' + esc(r.generatedBy) + ' · เอกสารนี้มีข้อมูลส่วนบุคคล โปรดใช้ในราชการเท่านั้น</div>' +
+        '</div>';
+      window.scrollTo({ top: el('rpt-result').offsetTop - 80, behavior: 'smooth' });
+    })
+    .catch(function (e) { busy(btn, false, '👁 แสดงตัวอย่าง'); toast(e.message, 'err'); });
+}
+
+function downloadReport(format, btn) {
+  busy(btn, true);
+  call('apiExportReport', [S.token, RPT.id, collectReportParams(), format])
+    .then(function (f) {
+      busy(btn, false, format === 'pdf' ? '📄 ดาวน์โหลด PDF' : '📊 ดาวน์โหลด Excel');
+      downloadBase64(f.fileName, f.mimeType, f.base64);
+      toast('สร้างไฟล์ ' + f.fileName + ' แล้ว', 'ok');
+    })
+    .catch(function (e) {
+      busy(btn, false, format === 'pdf' ? '📄 ดาวน์โหลด PDF' : '📊 ดาวน์โหลด Excel');
+      toast(e.message, 'err');
+    });
+}
+
+function exportStudentReport(studentId) {
+  RPT.id = 'R01';
+  RPT.params.studentId = studentId;
+  toast('กำลังสร้างรายงาน...');
+  call('apiExportReport', [S.token, 'R01', { studentId: studentId }, 'pdf'])
+    .then(function (f) { downloadBase64(f.fileName, f.mimeType, f.base64); toast('ดาวน์โหลดรายงานแล้ว', 'ok'); })
+    .catch(function (e) { toast(e.message, 'err'); });
+}
+
+/** แปลง base64 เป็นไฟล์แล้วสั่งดาวน์โหลดในเบราว์เซอร์ */
+function downloadBase64(fileName, mimeType, b64) {
+  try {
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    var url = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+    var a = document.createElement('a');
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 2000);
+  } catch (e) {
+    toast('เบราว์เซอร์นี้บล็อกการดาวน์โหลด กรุณาลองใช้ Chrome หรือเปิดเว็บแอปในแท็บใหม่', 'err');
+  }
+}
+</script>
+
+<script>
+/* ------------------------------------------------------------------ */
+/* 7. ตั้งค่าระบบ                                                       */
+/* ------------------------------------------------------------------ */
+
+VIEWS.admin = function (root) {
+  var tabs = [
+    { id: 'settings', label: 'ค่าตั้งค่า' },
+    { id: 'users',    label: 'ผู้ใช้งาน' },
+    { id: 'import',   label: 'นำเข้านักเรียน' },
+    { id: 'tools',    label: 'เครื่องมือ' }
+  ];
+  if (S.perm['audit.view']) tabs.push({ id: 'audit', label: 'ร่องรอยการใช้งาน' });
+
+  root.innerHTML =
+    '<div class="chips" style="margin-bottom:14px">' +
+      tabs.map(function (t, i) {
+        return '<button class="chip' + (i === 0 ? ' on' : '') + '" data-tab="' + t.id +
+          '" onclick="adminTab(\'' + t.id + '\')">' + esc(t.label) + '</button>';
+      }).join('') +
+    '</div><div id="admin-body"></div>';
+
+  return adminTab('settings');
+};
+
+function adminTab(id) {
+  $$('[data-tab]').forEach(function (c) { c.classList.toggle('on', c.getAttribute('data-tab') === id); });
+  var box = el('admin-body');
+  box.innerHTML = '<div class="card"><div class="skeleton" style="height:160px"></div></div>';
+
+  if (id === 'settings') {
+    return call('apiGetSettings', [S.token]).then(function (list) {
+      box.innerHTML = '<div class="card">' +
+        '<div class="card-head"><h3>ค่าตั้งค่าระบบ</h3>' +
+          '<span class="hint">แก้ไขได้โดยไม่ต้องแก้โปรแกรม</span></div>' +
+        '<div class="alert alert-info">ℹ ค่าที่กระทบสิทธิของนักเรียน เช่น ขอบเขต "ไม่เคยกระทำผิด" ' +
+          'ควรผ่านความเห็นชอบของคณะกรรมการสถานศึกษาก่อนแก้ไข</div>' +
+        list.map(function (s) {
+          return '<div class="field"><label>' + esc(s.key) + '</label>' +
+            '<div style="display:flex;gap:8px">' +
+              '<input type="text" value="' + esc(s.value) + '" data-setting="' + esc(s.key) + '">' +
+              '<button class="btn btn-sm" onclick="saveSetting(\'' + esc(s.key) + '\',this)">บันทึก</button>' +
+            '</div>' + (s.description ? '<div class="help">' + esc(s.description) + '</div>' : '') + '</div>';
+        }).join('') + '</div>';
+    });
+  }
+
+  if (id === 'users') {
+    return call('apiListUsers', [S.token]).then(function (list) {
+      box.innerHTML = '<div class="card">' +
+        '<div class="card-head"><h3>ผู้ใช้งานระบบ</h3>' +
+          '<div class="right"><button class="btn btn-primary btn-sm" onclick="openUserForm()">+ เพิ่มผู้ใช้</button></div></div>' +
+        '<div class="table-wrap"><table class="data"><thead><tr><th>ชื่อผู้ใช้</th><th>ชื่อ-สกุล</th>' +
+          '<th>บทบาท</th><th>ขอบเขต</th><th>สถานะ</th><th>เข้าใช้ล่าสุด</th><th></th></tr></thead><tbody>' +
+        list.map(function (u) {
+          return '<tr><td><b>' + esc(u.username) + '</b></td><td>' + esc(u.name) + '</td>' +
+            '<td>' + esc(u.roleName) + '</td><td class="small">' + esc(u.scope || '—') + '</td>' +
+            '<td>' + (u.active ? '<span class="badge badge-good">ใช้งาน</span>'
+                               : '<span class="badge badge-crit">ระงับ</span>') + '</td>' +
+            '<td class="small muted">' + esc(u.lastLogin || 'ยังไม่เคย') + '</td>' +
+            '<td><button class="btn btn-ghost btn-sm" onclick=\'openUserForm(' +
+              JSON.stringify(u).replace(/'/g, '&#39;') + ')\'>แก้ไข</button></td></tr>';
+        }).join('') + '</tbody></table></div>' +
+        '<div class="alert alert-warn" style="margin-top:14px">⚠ ห้ามใช้บัญชีร่วมกันหลายคน ' +
+          'เพราะจะทำให้ร่องรอยการใช้งานไร้ความหมายและตรวจสอบความเป็นธรรมไม่ได้</div>' +
+      '</div>';
+    });
+  }
+
+  if (id === 'import') {
+    box.innerHTML = '<div class="card">' +
+      '<div class="card-head"><h3>นำเข้ารายชื่อนักเรียนจากไฟล์ CSV</h3></div>' +
+      '<div class="alert alert-info">ℹ บรรทัดแรกต้องเป็นหัวตาราง ใช้ชื่อคอลัมน์ตามนี้ ' +
+        '(ลำดับสลับได้ คอลัมน์ที่ไม่มีให้เว้นว่าง)<br><code>รหัสนักเรียน, คำนำหน้า, ชื่อ, นามสกุล, เพศ, ' +
+        'ระดับชั้น, ห้อง, เลขที่, ยินยอมเผยแพร่, ชื่อผู้ปกครอง, โทรผู้ปกครอง</code></div>' +
+      '<div class="field"><label>วางข้อความ CSV ที่นี่</label>' +
+        '<textarea id="imp-csv" style="min-height:180px;font-family:ui-monospace,monospace;font-size:13px" ' +
+        'placeholder="รหัสนักเรียน,คำนำหน้า,ชื่อ,นามสกุล,เพศ,ระดับชั้น,ห้อง,เลขที่&#10;' +
+        '30001,เด็กชาย,กิตติ,ตั้งใจดี,ชาย,1,1,1"></textarea>' +
+        '<div class="help">เปิดไฟล์ Excel แล้วบันทึกเป็น .csv หรือคัดลอกข้อมูลจาก Google Sheets มาวางได้เลย</div></div>' +
+      '<button class="btn btn-primary" onclick="doImport(this)">นำเข้าข้อมูล</button>' +
+      '<div id="imp-result" style="margin-top:14px"></div></div>';
+    return Promise.resolve();
+  }
+
+  if (id === 'tools') {
+    box.innerHTML = '<div class="grid grid-2">' +
+      '<div class="card"><div class="card-head"><h3>คำนวณคะแนนคงเหลือใหม่</h3></div>' +
+        '<p class="small muted">คำนวณคะแนนของนักเรียนทุกคนใหม่จากบันทึกที่อนุมัติแล้วทั้งหมด ' +
+        'ใช้เมื่อสงสัยว่ายอดคะแนนไม่ตรง หรือหลังแก้ไขข้อมูลในชีตโดยตรง</p>' +
+        '<button class="btn btn-primary" onclick="doRebuild(this)">เริ่มคำนวณใหม่</button></div>' +
+      '<div class="card"><div class="card-head"><h3>ประกาศกระดานเกียรติยศ</h3></div>' +
+        '<p class="small muted">บันทึกอันดับปัจจุบันขึ้นหน้าเว็บสาธารณะ ' +
+        'แนะนำให้ตั้ง Trigger ให้รันอัตโนมัติทุกเช้าเวลา 06:00 น.</p>' +
+        '<button class="btn btn-primary" onclick="doPublishBoard(this)">ประกาศตอนนี้</button></div>' +
+      '<div class="card span-2"><div class="card-head"><h3>ลิงก์หน้าเว็บสาธารณะ</h3></div>' +
+        '<p class="small muted">นำลิงก์นี้ไปฝังในเว็บไซต์โรงเรียน จะแสดงเฉพาะกระดานเกียรติยศ ' +
+        'ไม่มีข้อมูลด้านลบใด ๆ และไม่ต้องเข้าสู่ระบบ</p>' +
+        '<div style="display:flex;gap:8px"><input type="text" id="pub-url" readonly ' +
+          'value="' + esc(location.href.split('?')[0] + '?page=board') + '">' +
+          '<button class="btn" onclick="copyPublicUrl()">คัดลอก</button></div></div>' +
+    '</div>';
+    return Promise.resolve();
+  }
+
+  if (id === 'audit') {
+    return call('apiAuditLog', [S.token, 200]).then(function (list) {
+      box.innerHTML = '<div class="card"><div class="card-head"><h3>ร่องรอยการใช้งานล่าสุด</h3>' +
+        '<span class="hint">200 รายการล่าสุด</span></div>' +
+        '<div class="table-wrap"><table class="data"><thead><tr><th>เมื่อ</th><th>ผู้ใช้</th>' +
+          '<th>การกระทำ</th><th>เป้าหมาย</th><th>รายละเอียด</th></tr></thead><tbody>' +
+        list.map(function (a) {
+          return '<tr><td class="small mono">' + esc(a.at) + '</td>' +
+            '<td>' + esc(a.user) + '<div class="small muted">' + esc(a.role) + '</div></td>' +
+            '<td>' + esc(a.action) + '</td><td class="small">' + esc(a.target) + '</td>' +
+            '<td class="small muted">' + esc(a.detail) + '</td></tr>';
+        }).join('') + '</tbody></table></div></div>';
+    });
+  }
+  return Promise.resolve();
+}
+
+function saveSetting(key, btn) {
+  var input = $('[data-setting="' + key.replace(/"/g, '\\"') + '"]');
+  busy(btn, true);
+  call('apiSaveSetting', [S.token, key, input.value])
+    .then(function () { busy(btn, false, 'บันทึก'); toast('บันทึกค่า "' + key + '" แล้ว', 'ok'); })
+    .catch(function (e) { busy(btn, false, 'บันทึก'); toast(e.message, 'err'); });
+}
+
+function openUserForm(u) {
+  u = u || {};
+  var roles = [['admin','ผู้ดูแลระบบ'],['affairs','ฝ่ายกิจการนักเรียน'],['level_head','หัวหน้าระดับชั้น'],
+               ['homeroom','ครูที่ปรึกษา'],['teacher','ครูผู้สอน'],['executive','ผู้บริหาร']];
+  openModal(u.id ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้',
+    '<div class="field"><label>ชื่อผู้ใช้ (ภาษาอังกฤษ)</label>' +
+      '<input id="uf-username" type="text" value="' + esc(u.username || '') + '" autocapitalize="none"></div>' +
+    '<div class="field"><label>ชื่อ-สกุล</label><input id="uf-name" type="text" value="' +
+      esc(u.name || '') + '"></div>' +
+    '<div class="field"><label>บทบาท</label><select id="uf-role">' +
+      roles.map(function (r) {
+        return '<option value="' + r[0] + '"' + (u.role === r[0] ? ' selected' : '') + '>' + r[1] + '</option>';
+      }).join('') + '</select></div>' +
+    '<div class="field"><label>ขอบเขตความรับผิดชอบ</label>' +
+      '<input id="uf-scope" type="text" value="' + esc(u.scope || '') + '" placeholder="เช่น 1/1,1/2">' +
+      '<div class="help">ครูที่ปรึกษาใส่ห้องคั่นด้วยจุลภาค เช่น 1/1,1/2 · ' +
+        'หัวหน้าระดับชั้นใส่ระดับ เช่น 1,2,3 · เว้นว่างหมายถึงเห็นทั้งโรงเรียน</div></div>' +
+    '<div class="field"><label>' + (u.id ? 'ตั้งรหัสผ่านใหม่ (เว้นว่างถ้าไม่เปลี่ยน)' : 'รหัสผ่านเริ่มต้น') + '</label>' +
+      '<input id="uf-pass" type="text" autocomplete="off" placeholder="อย่างน้อย 8 ตัวอักษร">' +
+      '<div class="help">ผู้ใช้จะถูกบังคับให้เปลี่ยนรหัสผ่านเมื่อเข้าใช้ครั้งแรก</div></div>' +
+    (u.id ? '<div class="field"><label style="display:flex;gap:9px;align-items:center;font-weight:400">' +
+      '<input type="checkbox" id="uf-active" style="width:auto;min-height:0"' +
+      (u.active !== false ? ' checked' : '') + '> เปิดใช้งานบัญชีนี้</label></div>' : '') +
+    '<div id="uf-error"></div>',
+    '<button class="btn" onclick="closeModal()">ยกเลิก</button>' +
+    '<button class="btn btn-primary" id="uf-save">บันทึก</button>');
+
+  el('uf-save').onclick = function () {
+    var btn = this; busy(btn, true);
+    call('apiSaveUser', [S.token, {
+      id: u.id || null, username: el('uf-username').value, name: el('uf-name').value,
+      role: el('uf-role').value, scope: el('uf-scope').value,
+      password: el('uf-pass').value, active: el('uf-active') ? el('uf-active').checked : true
+    }]).then(function () {
+      closeModal(); toast('บันทึกผู้ใช้เรียบร้อย', 'ok'); adminTab('users');
+    }).catch(function (e) {
+      busy(btn, false, 'บันทึก');
+      el('uf-error').innerHTML = '<div class="alert alert-error">⚠ ' + esc(e.message) + '</div>';
+    });
+  };
+}
+
+function doImport(btn) {
+  var csv = el('imp-csv').value.trim();
+  if (!csv) { toast('กรุณาวางข้อมูล CSV', 'err'); return; }
+  busy(btn, true);
+  call('apiImportStudents', [S.token, csv]).then(function (r) {
+    busy(btn, false, 'นำเข้าข้อมูล');
+    el('imp-result').innerHTML =
+      '<div class="alert ' + (r.errors.length ? 'alert-warn' : 'alert-info') + '">' +
+        '✓ นำเข้าสำเร็จ ' + r.inserted + ' คน' +
+        (r.skipped ? ' · ข้าม ' + r.skipped + ' คน (รหัสซ้ำกับที่มีอยู่แล้ว)' : '') +
+      '</div>' +
+      (r.errors.length ? '<div class="alert alert-error">พบปัญหา ' + r.errors.length + ' บรรทัด:<br>' +
+        r.errors.map(esc).join('<br>') + '</div>' : '');
+    if (r.inserted) el('imp-csv').value = '';
+  }).catch(function (e) { busy(btn, false, 'นำเข้าข้อมูล'); toast(e.message, 'err'); });
+}
+
+function doRebuild(btn) {
+  confirmAction('คำนวณคะแนนใหม่',
+    'ระบบจะคำนวณคะแนนของนักเรียนทุกคนใหม่จากบันทึกที่อนุมัติแล้ว อาจใช้เวลาสักครู่',
+    function () {
+      busy(btn, true);
+      call('apiRebuildBalances', [S.token]).then(function (r) {
+        busy(btn, false, 'เริ่มคำนวณใหม่');
+        toast('คำนวณคะแนนใหม่เรียบร้อย ' + r.count + ' คน', 'ok');
+      }).catch(function (e) { busy(btn, false, 'เริ่มคำนวณใหม่'); toast(e.message, 'err'); });
+    });
+}
+
+function copyPublicUrl() {
+  var input = el('pub-url');
+  input.select();
+  try {
+    navigator.clipboard.writeText(input.value);
+    toast('คัดลอกลิงก์แล้ว', 'ok');
+  } catch (e) {
+    document.execCommand('copy');
+    toast('คัดลอกลิงก์แล้ว', 'ok');
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 8. หน้าเว็บสาธารณะ — กระดานเกียรติยศ (ไม่ต้องเข้าสู่ระบบ)                */
+/*    แสดงเฉพาะข้อมูลด้านบวก ไม่มีคะแนนที่ถูกหักหรือรายชื่อผู้กระทำผิดใด ๆ      */
+/* ------------------------------------------------------------------ */
+
+function renderPublicBoard() {
+  el('root').innerHTML = '<div class="content" style="margin:0 auto;padding:26px 16px">' +
+    '<div class="skeleton" style="height:200px"></div></div>';
+
+  call('apiPublicLeaderboard', []).then(function (d) {
+    el('root').innerHTML =
+      '<div style="background:linear-gradient(140deg,var(--brand),var(--brand-2));color:#fff;' +
+        'padding:34px 20px;text-align:center">' +
+        '<div style="font-size:40px;line-height:1">🏅</div>' +
+        '<h1 style="font-size:24px;margin:8px 0 4px">กระดานเกียรติยศ</h1>' +
+        '<div style="opacity:.9;font-size:14.5px">' + esc(d.school) + ' · ปีการศึกษา ' + esc(d.year) + '</div>' +
+        (d.totalMeritActs
+          ? '<div style="margin-top:16px;display:inline-block;background:rgba(255,255,255,.16);' +
+            'padding:9px 18px;border-radius:20px;font-size:14px">' +
+            'ปีการศึกษานี้นักเรียนของเราทำความดีแล้ว <b>' + num(d.totalMeritActs) + '</b> ครั้ง</div>'
+          : '') +
+      '</div>' +
+      '<div class="content" style="margin:0 auto;padding:22px 16px 40px">' +
+        (d.lower.length || d.upper.length
+          ? '<div class="grid grid-2">' +
+              publicBoardCard('มัธยมศึกษาตอนต้น', 'ม.1 – ม.3', d.lower) +
+              publicBoardCard('มัธยมศึกษาตอนปลาย', 'ม.4 – ม.6', d.upper) +
+            '</div>'
+          : '<div class="card"><div class="empty"><div class="big">🌱</div>' +
+            '<b>ยังไม่มีการประกาศกระดานเกียรติยศ</b>' +
+            '<div class="small">โปรดติดตามเร็ว ๆ นี้</div></div></div>') +
+        (d.publishedAtThai
+          ? '<p class="small muted" style="text-align:center;margin-top:20px">ข้อมูล ณ ' +
+            esc(d.publishedAtThai) + '</p>' : '') +
+        '<p class="small muted" style="text-align:center;margin-top:6px">' +
+          'นักเรียนที่ปรากฏบนกระดานนี้เป็นผู้ที่ไม่เคยมีประวัติการกระทำผิด ' +
+          'และได้รับความยินยอมจากผู้ปกครองในการเผยแพร่ชื่อแล้ว</p>' +
+        (PUBLIC_MODE ? '' :
+          '<div style="text-align:center;margin-top:18px">' +
+          '<button class="btn" onclick="renderLogin()">← กลับหน้าเข้าสู่ระบบ</button></div>') +
+      '</div>';
+  }).catch(function (e) {
+    el('root').innerHTML = '<div class="content" style="margin:0 auto;padding:26px 16px">' +
+      '<div class="alert alert-error">⚠ ' + esc(e.message) + '</div>' +
+      (PUBLIC_MODE ? '' : '<button class="btn" onclick="renderLogin()">กลับหน้าเข้าสู่ระบบ</button>') + '</div>';
+  });
+}
+
+function publicBoardCard(title, sub, items) {
+  return '<div class="card">' +
+    '<div class="card-head"><div><h3>' + esc(title) + '</h3>' +
+      '<div class="small muted">' + esc(sub) + '</div></div></div>' +
+    (items.length
+      ? items.map(function (c) {
+          return '<div class="rank-item">' +
+            '<div class="rank-no rank-' + c.rank + '">' + c.rank + '</div>' +
+            '<div class="rank-name"><b>' + esc(c.displayName) + '</b>' +
+              '<span>' + esc(c.classLabel) + '</span></div>' +
+            '<div class="rank-score">' + c.meritTotal + ' <small>คะแนน</small></div></div>';
+        }).join('')
+      : '<div class="empty small">ยังไม่มีรายชื่อในระดับนี้</div>') +
+  '</div>';
+}
+</script>

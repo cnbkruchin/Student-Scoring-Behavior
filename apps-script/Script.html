@@ -1,0 +1,357 @@
+<script>
+/* ==================================================================
+   แกนหลักของหน้าเว็บ: สถานะ การเรียก API เราเตอร์ และส่วนประกอบร่วม
+   ================================================================== */
+
+var S = {
+  token: null,
+  user: null,
+  perm: {},
+  app: {},
+  view: 'dashboard',
+  cache: {},
+  pendingCount: 0
+};
+
+var TOKEN_KEY = 'scss_token';
+
+/* ---------------- เรียก API ---------------- */
+
+/**
+ * เรียกฟังก์ชันฝั่งเซิร์ฟเวอร์ คืน Promise
+ * ฟังก์ชันฝั่งเซิร์ฟเวอร์ทุกตัวคืน { ok, data } หรือ { ok:false, error }
+ * เซสชันหมดอายุจะพากลับหน้าเข้าสู่ระบบให้อัตโนมัติ
+ */
+function call(fn, args) {
+  return new Promise(function (resolve, reject) {
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (res && res.ok) return resolve(res.data);
+        var msg = (res && res.error) || 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ';
+        if (msg.indexOf('เซสชันหมดอายุ') >= 0) {
+          clearToken();
+          renderLogin('เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง');
+        }
+        reject(new Error(msg));
+      })
+      .withFailureHandler(function (err) {
+        reject(new Error(err && err.message ? err.message : 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ'));
+      })[fn].apply(null, args || []);
+  });
+}
+
+function saveToken(t) {
+  S.token = t;
+  try { localStorage.setItem(TOKEN_KEY, t); } catch (e) { /* โหมดส่วนตัวของเบราว์เซอร์ */ }
+}
+function loadToken() {
+  try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; }
+}
+function clearToken() {
+  S.token = null; S.user = null;
+  try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+}
+
+/* ---------------- ตัวช่วยทั่วไป ---------------- */
+
+function esc(v) {
+  return String(v === null || v === undefined ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function $(sel, root) { return (root || document).querySelector(sel); }
+function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+function el(id) { return document.getElementById(id); }
+function num(v) { return Number(v || 0).toLocaleString('th-TH'); }
+function initials(name) {
+  var s = String(name || '?').replace(/^(นาย|นาง|นางสาว|เด็กชาย|เด็กหญิง|ด\.ช\.|ด\.ญ\.)/, '').trim();
+  return s.charAt(0) || '?';
+}
+
+function toast(message, kind) {
+  var wrap = el('toasts');
+  var t = document.createElement('div');
+  t.className = 'toast ' + (kind || '');
+  t.innerHTML = (kind === 'ok' ? '✓ ' : kind === 'err' ? '⚠ ' : '') + esc(message);
+  wrap.appendChild(t);
+  setTimeout(function () {
+    t.style.transition = 'opacity .25s'; t.style.opacity = '0';
+    setTimeout(function () { t.remove(); }, 260);
+  }, kind === 'err' ? 5200 : 3000);
+}
+
+function openModal(title, bodyHtml, footHtml) {
+  el('modal-root').innerHTML =
+    '<div class="modal-back" onclick="if(event.target===this)closeModal()">' +
+      '<div class="modal" role="dialog" aria-modal="true">' +
+        '<div class="modal-head"><h3>' + esc(title) + '</h3>' +
+          '<button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="closeModal()">✕</button></div>' +
+        '<div class="modal-body">' + bodyHtml + '</div>' +
+        (footHtml ? '<div class="modal-foot">' + footHtml + '</div>' : '') +
+      '</div></div>';
+}
+function closeModal() { el('modal-root').innerHTML = ''; }
+
+function confirmAction(title, message, onYes, danger) {
+  openModal(title, '<p>' + esc(message) + '</p>',
+    '<button class="btn" onclick="closeModal()">ยกเลิก</button>' +
+    '<button class="btn ' + (danger ? 'btn-danger' : 'btn-primary') + '" id="cf-yes">ยืนยัน</button>');
+  el('cf-yes').onclick = function () { closeModal(); onYes(); };
+}
+
+function busy(button, isBusy, labelWhenDone) {
+  if (!button) return;
+  if (isBusy) {
+    button.dataset.label = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner"></span> กำลังทำงาน...';
+  } else {
+    button.disabled = false;
+    button.innerHTML = labelWhenDone || button.dataset.label || 'ตกลง';
+  }
+}
+
+function riskBadge(level) {
+  var map = { 'ปกติ': 'badge-good', 'เฝ้าระวัง': 'badge-warn', 'เสี่ยง': 'badge-serious', 'วิกฤต': 'badge-crit' };
+  var icon = { 'ปกติ': '●', 'เฝ้าระวัง': '▲', 'เสี่ยง': '▲', 'วิกฤต': '■' };
+  return '<span class="badge ' + (map[level] || '') + '">' + (icon[level] || '') + ' ' + esc(level) + '</span>';
+}
+
+function scoreColor(score) {
+  if (score >= 91) return 'var(--good)';
+  if (score >= 71) return 'var(--warning)';
+  if (score >= 51) return 'var(--serious)';
+  return 'var(--critical)';
+}
+
+function statusBadge(status) {
+  var map = {
+    'รออนุมัติ': 'badge-warn', 'อนุมัติแล้ว': 'badge-good',
+    'ไม่อนุมัติ': 'badge-crit', 'เพิกถอน': 'badge'
+  };
+  return '<span class="badge ' + (map[status] || '') + '">' + esc(status) + '</span>';
+}
+
+/* ---------------- เมนู ---------------- */
+
+var MENU = [
+  { id: 'dashboard', icon: '📊', label: 'แดชบอร์ด',      perm: null },
+  { id: 'record',    icon: '✏️', label: 'บันทึกพฤติกรรม', perm: 'record.create' },
+  { id: 'approve',   icon: '✅', label: 'รออนุมัติ',      perm: 'record.approve', badge: true },
+  { id: 'students',  icon: '👥', label: 'นักเรียน',       perm: 'student.view' },
+  { id: 'board',     icon: '🏅', label: 'กระดานเกียรติยศ', perm: null },
+  { id: 'reports',   icon: '📄', label: 'รายงาน',         perm: 'report.view' },
+  { id: 'admin',     icon: '⚙️', label: 'ตั้งค่าระบบ',     perm: 'settings.manage' }
+];
+
+function visibleMenu() {
+  return MENU.filter(function (m) { return !m.perm || S.perm[m.perm]; });
+}
+
+/* เมนูล่างบนมือถือแสดงได้ 5 ช่อง ที่เหลือรวมใน "เพิ่มเติม" */
+function mobileMenu() {
+  var items = visibleMenu();
+  if (items.length <= 5) return items;
+  return items.slice(0, 4).concat([{ id: '__more', icon: '⋯', label: 'เพิ่มเติม' }]);
+}
+
+/* ---------------- โครงหน้า ---------------- */
+
+function renderShell() {
+  var menu = visibleMenu();
+  var mob = mobileMenu();
+
+  el('root').innerHTML =
+    '<div class="app">' +
+      '<nav class="sidebar">' +
+        '<div class="brand">' +
+          '<div class="brand-mark">🎓</div>' +
+          '<div class="brand-text"><b>คะแนนความประพฤติ</b><span>' + esc(S.app.school || '') + '</span></div>' +
+        '</div>' +
+        menu.map(function (m) {
+          return '<button class="navlink" data-nav="' + m.id + '" onclick="go(\'' + m.id + '\')">' +
+            '<span class="ico">' + m.icon + '</span>' + esc(m.label) +
+            (m.badge ? '<span class="pill hide" data-pending></span>' : '') + '</button>';
+        }).join('') +
+        '<div class="nav-sep"></div>' +
+        '<button class="navlink" onclick="openChangePassword()"><span class="ico">🔑</span>เปลี่ยนรหัสผ่าน</button>' +
+        '<button class="navlink" onclick="doLogout()"><span class="ico">🚪</span>ออกจากระบบ</button>' +
+        '<div class="nav-foot">ปีการศึกษา ' + esc(S.app.year) + ' ภาคเรียนที่ ' + esc(S.app.term) +
+          '<br>เวอร์ชัน ' + esc(S.app.version) + '</div>' +
+      '</nav>' +
+
+      '<div class="main">' +
+        '<header class="topbar">' +
+          '<div><h1 id="page-title">แดชบอร์ด</h1>' +
+            '<div class="sub" id="page-sub">ปีการศึกษา ' + esc(S.app.year) +
+            ' ภาคเรียนที่ ' + esc(S.app.term) + '</div></div>' +
+          '<div class="topbar-right">' +
+            '<div class="who"><b>' + esc(S.user.name) + '</b><span>' + esc(S.user.roleName) + '</span></div>' +
+            '<div class="avatar">' + esc(initials(S.user.name)) + '</div>' +
+          '</div>' +
+        '</header>' +
+        '<main class="content" id="content"></main>' +
+      '</div>' +
+    '</div>' +
+
+    '<nav class="mobile-bar">' +
+      mob.map(function (m) {
+        return '<button data-nav="' + m.id + '" onclick="' +
+          (m.id === '__more' ? 'openMoreMenu()' : 'go(\'' + m.id + '\')') + '">' +
+          '<span class="ico">' + m.icon + '</span>' + esc(m.label) +
+          (m.badge ? '<span class="dot hide" data-pending></span>' : '') + '</button>';
+      }).join('') +
+    '</nav>';
+}
+
+function openMoreMenu() {
+  var shown = mobileMenu().map(function (m) { return m.id; });
+  var rest = visibleMenu().filter(function (m) { return shown.indexOf(m.id) < 0; });
+  openModal('เมนูเพิ่มเติม',
+    '<div class="pick-list">' +
+      rest.map(function (m) {
+        return '<div class="pick-item" onclick="closeModal();go(\'' + m.id + '\')">' +
+          '<span style="font-size:19px">' + m.icon + '</span><div class="grow"><b>' + esc(m.label) + '</b></div></div>';
+      }).join('') +
+      '<div class="pick-item" onclick="closeModal();openChangePassword()">' +
+        '<span style="font-size:19px">🔑</span><div class="grow"><b>เปลี่ยนรหัสผ่าน</b></div></div>' +
+      '<div class="pick-item" onclick="closeModal();doLogout()">' +
+        '<span style="font-size:19px">🚪</span><div class="grow"><b>ออกจากระบบ</b></div></div>' +
+    '</div>');
+}
+
+function setActiveNav(view) {
+  $$('[data-nav]').forEach(function (n) {
+    n.classList.toggle('active', n.getAttribute('data-nav') === view);
+  });
+}
+
+function updatePendingBadge(count) {
+  S.pendingCount = count;
+  $$('[data-pending]').forEach(function (b) {
+    b.textContent = count > 99 ? '99+' : count;
+    b.classList.toggle('hide', !count);
+  });
+}
+
+var VIEWS = {};   // ลงทะเบียนไว้ใน ScriptViews.html
+
+function go(view) {
+  if (!VIEWS[view]) view = 'dashboard';
+  S.view = view;
+  setActiveNav(view);
+  var meta = MENU.filter(function (m) { return m.id === view; })[0];
+  if (meta) el('page-title').textContent = meta.label;
+  var content = el('content');
+  content.innerHTML = '<div class="grid grid-2">' +
+    '<div class="card"><div class="skeleton" style="height:100px"></div></div>' +
+    '<div class="card"><div class="skeleton" style="height:100px"></div></div></div>';
+  window.scrollTo(0, 0);
+
+  Promise.resolve(VIEWS[view](content)).catch(function (e) {
+    content.innerHTML = '<div class="card"><div class="alert alert-error">⚠ ' + esc(e.message) + '</div>' +
+      '<button class="btn" onclick="go(\'' + view + '\')">ลองใหม่</button></div>';
+  });
+}
+
+/* ---------------- เข้าสู่ระบบ ---------------- */
+
+function renderLogin(message) {
+  el('root').innerHTML =
+    '<div class="login-page"><div class="login-card">' +
+      '<div class="login-logo">🎓</div>' +
+      '<h2 style="text-align:center;font-size:19px">ระบบคะแนนความประพฤตินักเรียน</h2>' +
+      '<p style="text-align:center;color:var(--muted);font-size:13.5px;margin-bottom:20px">โรงเรียนจุนวิทยาคม</p>' +
+      (message ? '<div class="alert alert-warn">⚠ ' + esc(message) + '</div>' : '') +
+      '<div id="login-error"></div>' +
+      '<form id="login-form" autocomplete="on">' +
+        '<div class="field"><label for="lg-user">ชื่อผู้ใช้</label>' +
+          '<input id="lg-user" type="text" autocomplete="username" autocapitalize="none" ' +
+          'spellcheck="false" required placeholder="เช่น kru.somchai"></div>' +
+        '<div class="field"><label for="lg-pass">รหัสผ่าน</label>' +
+          '<input id="lg-pass" type="password" autocomplete="current-password" required></div>' +
+        '<button class="btn btn-primary btn-block" type="submit" id="lg-btn" style="margin-top:6px">เข้าสู่ระบบ</button>' +
+      '</form>' +
+      '<div class="divider"></div>' +
+      '<button class="btn btn-ghost btn-block btn-sm" onclick="renderPublicBoard()">' +
+        '🏅 ดูกระดานเกียรติยศ (ไม่ต้องเข้าสู่ระบบ)</button>' +
+    '</div></div>';
+
+  el('login-form').onsubmit = function (ev) {
+    ev.preventDefault();
+    var btn = el('lg-btn');
+    el('login-error').innerHTML = '';
+    busy(btn, true);
+    call('apiLogin', [el('lg-user').value, el('lg-pass').value])
+      .then(function (res) {
+        saveToken(res.token);
+        S.user = res.user; S.perm = res.permissions; S.app = res.app;
+        renderShell();
+        go('dashboard');
+        if (res.user.mustChangePassword) {
+          setTimeout(function () { openChangePassword(true); }, 400);
+        }
+      })
+      .catch(function (e) {
+        busy(btn, false, 'เข้าสู่ระบบ');
+        el('login-error').innerHTML = '<div class="alert alert-error">⚠ ' + esc(e.message) + '</div>';
+      });
+  };
+  setTimeout(function () { var u = el('lg-user'); if (u) u.focus(); }, 60);
+}
+
+function doLogout() {
+  confirmAction('ออกจากระบบ', 'ต้องการออกจากระบบใช่หรือไม่', function () {
+    var t = S.token;
+    clearToken();
+    renderLogin();
+    call('apiLogout', [t]).catch(function () {});
+  });
+}
+
+function openChangePassword(forced) {
+  openModal('เปลี่ยนรหัสผ่าน',
+    (forced ? '<div class="alert alert-warn">⚠ นี่เป็นการเข้าใช้ครั้งแรก กรุณาตั้งรหัสผ่านใหม่ก่อนใช้งาน</div>' : '') +
+    '<div id="cp-error"></div>' +
+    '<div class="field"><label>รหัสผ่านเดิม</label><input id="cp-old" type="password" autocomplete="current-password"></div>' +
+    '<div class="field"><label>รหัสผ่านใหม่</label><input id="cp-new" type="password" autocomplete="new-password">' +
+      '<div class="help">อย่างน้อย 8 ตัวอักษร ควรผสมตัวอักษรและตัวเลข</div></div>' +
+    '<div class="field"><label>ยืนยันรหัสผ่านใหม่</label><input id="cp-new2" type="password" autocomplete="new-password"></div>',
+    '<button class="btn" onclick="closeModal()">ปิด</button>' +
+    '<button class="btn btn-primary" id="cp-save">บันทึก</button>');
+
+  el('cp-save').onclick = function () {
+    var a = el('cp-new').value, b = el('cp-new2').value;
+    if (a !== b) {
+      el('cp-error').innerHTML = '<div class="alert alert-error">⚠ รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน</div>';
+      return;
+    }
+    var btn = this;
+    busy(btn, true);
+    call('apiChangePassword', [S.token, el('cp-old').value, a])
+      .then(function () { closeModal(); toast('เปลี่ยนรหัสผ่านเรียบร้อย', 'ok'); })
+      .catch(function (e) {
+        busy(btn, false, 'บันทึก');
+        el('cp-error').innerHTML = '<div class="alert alert-error">⚠ ' + esc(e.message) + '</div>';
+      });
+  };
+}
+
+/* ---------------- เริ่มทำงาน ---------------- */
+
+function boot() {
+  if (PUBLIC_MODE) { renderPublicBoard(); return; }
+
+  var t = loadToken();
+  if (!t) { renderLogin(); return; }
+
+  S.token = t;
+  call('apiMe', [t])
+    .then(function (res) {
+      S.user = res.user; S.perm = res.permissions; S.app = res.app;
+      renderShell();
+      go('dashboard');
+    })
+    .catch(function () { clearToken(); renderLogin(); });
+}
+</script>
