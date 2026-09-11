@@ -161,7 +161,7 @@ VIEWS.record = function (root) {
         '<div class="field"><label>1. เลือกนักเรียน</label>' +
           '<div id="rec-student"></div></div>' +
 
-        '<div class="field"><label>2. เลือกหลักเกณฑ์</label>' +
+        '<div class="field"><label>2. เลือกหลักเกณฑ์ <span class="muted" id="rule-count"></span></label>' +
           '<input type="search" id="rule-search" placeholder="พิมพ์ค้นหาเกณฑ์..." ' +
             'oninput="renderRules()" style="margin-bottom:8px">' +
           '<div class="pick-list" id="rule-list"></div></div>' +
@@ -226,17 +226,38 @@ function renderRules() {
     return (r.code + ' ' + r.name + ' ' + r.category).toLowerCase().indexOf(q) >= 0;
   });
 
-  el('rule-list').innerHTML = list.length ? list.map(function (r) {
-    var sev = r.severity ? ['', 'เบา', 'ปานกลาง', 'ร้ายแรง', 'ร้ายแรงมาก'][r.severity] : '';
-    return '<div class="pick-item' + (REC.rule && REC.rule.id === r.id ? ' on' : '') +
-      '" onclick="pickRule(' + r.id + ')">' +
-      '<div class="grow"><b>' + esc(r.name) + '</b>' +
-        '<span>' + esc(r.code) + ' · ' + esc(r.category) + (sev ? ' · ระดับ' + sev : '') +
-        (r.requiresEvidence ? ' · ต้องมีหลักฐาน' : '') + '</span></div>' +
-      '<div class="pick-pts" style="color:' + (r.kind === 'ความดี' ? 'var(--series-1)' : 'var(--series-2)') + '">' +
-        (r.kind === 'ความดี' ? '+' : '−') + r.points + '</div>' +
-    '</div>';
-  }).join('') : '<div class="empty small">ไม่พบหลักเกณฑ์ที่ค้นหา</div>';
+  if (!list.length) {
+    el('rule-list').innerHTML = '<div class="empty small">ไม่พบหลักเกณฑ์ที่ค้นหา</div>';
+    el('rule-count').textContent = '';
+    return;
+  }
+
+  // จัดกลุ่มตามหมวดเพื่อให้หาเจอเร็วขึ้น ตอนนี้มีเกณฑ์รวมกันเกือบร้อยข้อ
+  var groups = [], seen = {};
+  list.forEach(function (r) {
+    var cat = r.category || 'ทั่วไป';
+    if (!seen[cat]) { seen[cat] = { name: cat, items: [] }; groups.push(seen[cat]); }
+    seen[cat].items.push(r);
+  });
+
+  el('rule-count').textContent = list.length + ' ข้อ';
+  el('rule-list').innerHTML = groups.map(function (g) {
+    return '<div style="position:sticky;top:0;z-index:1;background:var(--surface-2);padding:5px 13px;' +
+        'font-size:11.5px;font-weight:700;color:var(--ink-2)">' + esc(g.name) + '</div>' +
+      g.items.map(function (r) {
+        var sev = r.severity ? ['', 'เบา', 'ปานกลาง', 'ร้ายแรง', 'ร้ายแรงมาก'][r.severity] : '';
+        return '<div class="pick-item' + (REC.rule && REC.rule.id === r.id ? ' on' : '') +
+          '" onclick="pickRule(' + r.id + ')">' +
+          '<div class="grow"><b>' + esc(r.name) + '</b>' +
+            '<span>' + esc(r.code) + (r.oldCode ? ' (รหัสเดิม ' + esc(r.oldCode) + ')' : '') +
+            (sev ? ' · ระดับ' + sev : '') +
+            (r.requiresEvidence ? ' · ต้องมีหลักฐาน' : '') + '</span></div>' +
+          '<div class="pick-pts" style="color:' +
+            (r.kind === 'ความดี' ? 'var(--series-1)' : 'var(--series-2)') + '">' +
+            (r.kind === 'ความดี' ? '+' : '−') + r.points + '</div>' +
+        '</div>';
+      }).join('');
+  }).join('');
 }
 
 function pickRule(id) {
@@ -873,8 +894,9 @@ function downloadBase64(fileName, mimeType, b64) {
 VIEWS.admin = function (root) {
   var tabs = [
     { id: 'settings', label: 'ค่าตั้งค่า' },
+    { id: 'rules',    label: 'หลักเกณฑ์คะแนน' },
     { id: 'users',    label: 'ผู้ใช้งาน' },
-    { id: 'import',   label: 'นำเข้านักเรียน' },
+    { id: 'import',   label: 'นำเข้าข้อมูล' },
     { id: 'tools',    label: 'เครื่องมือ' }
   ];
   if (S.perm['audit.view']) tabs.push({ id: 'audit', label: 'ร่องรอยการใช้งาน' });
@@ -934,21 +956,8 @@ function adminTab(id) {
     });
   }
 
-  if (id === 'import') {
-    box.innerHTML = '<div class="card">' +
-      '<div class="card-head"><h3>นำเข้ารายชื่อนักเรียนจากไฟล์ CSV</h3></div>' +
-      '<div class="alert alert-info">ℹ บรรทัดแรกต้องเป็นหัวตาราง ใช้ชื่อคอลัมน์ตามนี้ ' +
-        '(ลำดับสลับได้ คอลัมน์ที่ไม่มีให้เว้นว่าง)<br><code>รหัสนักเรียน, คำนำหน้า, ชื่อ, นามสกุล, เพศ, ' +
-        'ระดับชั้น, ห้อง, เลขที่, ยินยอมเผยแพร่, ชื่อผู้ปกครอง, โทรผู้ปกครอง</code></div>' +
-      '<div class="field"><label>วางข้อความ CSV ที่นี่</label>' +
-        '<textarea id="imp-csv" style="min-height:180px;font-family:ui-monospace,monospace;font-size:13px" ' +
-        'placeholder="รหัสนักเรียน,คำนำหน้า,ชื่อ,นามสกุล,เพศ,ระดับชั้น,ห้อง,เลขที่&#10;' +
-        '30001,เด็กชาย,กิตติ,ตั้งใจดี,ชาย,1,1,1"></textarea>' +
-        '<div class="help">เปิดไฟล์ Excel แล้วบันทึกเป็น .csv หรือคัดลอกข้อมูลจาก Google Sheets มาวางได้เลย</div></div>' +
-      '<button class="btn btn-primary" onclick="doImport(this)">นำเข้าข้อมูล</button>' +
-      '<div id="imp-result" style="margin-top:14px"></div></div>';
-    return Promise.resolve();
-  }
+  if (id === 'rules')  return renderRulesTab(box);
+  if (id === 'import') return renderImportTab(box);
 
   if (id === 'tools') {
     box.innerHTML = '<div class="grid grid-2">' +
@@ -1037,23 +1046,6 @@ function openUserForm(u) {
   };
 }
 
-function doImport(btn) {
-  var csv = el('imp-csv').value.trim();
-  if (!csv) { toast('กรุณาวางข้อมูล CSV', 'err'); return; }
-  busy(btn, true);
-  call('apiImportStudents', [S.token, csv]).then(function (r) {
-    busy(btn, false, 'นำเข้าข้อมูล');
-    el('imp-result').innerHTML =
-      '<div class="alert ' + (r.errors.length ? 'alert-warn' : 'alert-info') + '">' +
-        '✓ นำเข้าสำเร็จ ' + r.inserted + ' คน' +
-        (r.skipped ? ' · ข้าม ' + r.skipped + ' คน (รหัสซ้ำกับที่มีอยู่แล้ว)' : '') +
-      '</div>' +
-      (r.errors.length ? '<div class="alert alert-error">พบปัญหา ' + r.errors.length + ' บรรทัด:<br>' +
-        r.errors.map(esc).join('<br>') + '</div>' : '');
-    if (r.inserted) el('imp-csv').value = '';
-  }).catch(function (e) { busy(btn, false, 'นำเข้าข้อมูล'); toast(e.message, 'err'); });
-}
-
 function doRebuild(btn) {
   confirmAction('คำนวณคะแนนใหม่',
     'ระบบจะคำนวณคะแนนของนักเรียนทุกคนใหม่จากบันทึกที่อนุมัติแล้ว อาจใช้เวลาสักครู่',
@@ -1140,5 +1132,401 @@ function publicBoardCard(title, sub, items) {
         }).join('')
       : '<div class="empty small">ยังไม่มีรายชื่อในระดับนี้</div>') +
   '</div>';
+}
+</script>
+
+<script>
+/* ------------------------------------------------------------------ */
+/* 9. จัดการหลักเกณฑ์คะแนน                                              */
+/* ------------------------------------------------------------------ */
+
+var RULEMGR = { kind: 'ความดี', q: '', list: [] };
+
+function renderRulesTab(box) {
+  box.innerHTML = '<div class="card"><div class="skeleton" style="height:200px"></div></div>';
+  return call('apiListAllRules', [S.token]).then(function (list) {
+    RULEMGR.list = list;
+    drawRulesTable(box);
+  });
+}
+
+function drawRulesTable(box) {
+  box = box || el('admin-body');
+  var counts = { 'ความดี': 0, 'ความผิด': 0 };
+  RULEMGR.list.forEach(function (r) { counts[r.kind]++; });
+
+  var q = RULEMGR.q.trim().toLowerCase();
+  var rows = RULEMGR.list.filter(function (r) {
+    if (r.kind !== RULEMGR.kind) return false;
+    if (!q) return true;
+    return (r.code + ' ' + r.oldCode + ' ' + r.name + ' ' + r.category).toLowerCase().indexOf(q) >= 0;
+  });
+
+  box.innerHTML =
+    '<div class="card">' +
+      '<div class="card-head"><h3>หลักเกณฑ์คะแนน</h3>' +
+        '<div class="right">' +
+          '<button class="btn btn-primary btn-sm" onclick="openRuleForm()">+ เพิ่มเกณฑ์</button>' +
+        '</div></div>' +
+
+      '<div class="chips" style="margin-bottom:12px">' +
+        '<button class="chip' + (RULEMGR.kind === 'ความดี' ? ' on' : '') +
+          '" onclick="setRuleKind(\'ความดี\')">🌟 เกณฑ์ทำความดี (' + counts['ความดี'] + ')</button>' +
+        '<button class="chip' + (RULEMGR.kind === 'ความผิด' ? ' on' : '') +
+          '" onclick="setRuleKind(\'ความผิด\')">⚠️ เกณฑ์คะแนนไม่พึงประสงค์ (' + counts['ความผิด'] + ')</button>' +
+      '</div>' +
+
+      '<input type="search" id="rule-q" placeholder="ค้นหาชื่อเกณฑ์ รหัส หรือหมวด" value="' +
+        esc(RULEMGR.q) + '" oninput="RULEMGR.q=this.value;drawRulesTable();" style="margin-bottom:12px">' +
+
+      '<div class="table-wrap"><table class="data"><thead><tr>' +
+        '<th>รหัส</th><th>รหัสเดิม</th><th>ชื่อเกณฑ์</th><th class="num">คะแนน</th>' +
+        '<th>หมวด</th>' + (RULEMGR.kind === 'ความผิด' ? '<th>ระดับ</th>' : '<th>เพดาน/ภาคเรียน</th>') +
+        '<th>สถานะ</th><th>จัดการ</th>' +
+      '</tr></thead><tbody>' +
+      (rows.length ? rows.map(ruleRow).join('')
+        : '<tr><td colspan="8"><div class="empty small">ไม่พบเกณฑ์ที่ค้นหา</div></td></tr>') +
+      '</tbody></table></div>' +
+
+      '<div class="alert alert-info" style="margin-top:14px">ℹ ' +
+        'เกณฑ์ที่เคยถูกใช้บันทึกไปแล้วจะลบไม่ได้ ระบบจะปิดการใช้งานแทน ' +
+        'เพื่อไม่ให้ประวัติของนักเรียนที่อ้างอิงเกณฑ์นั้นเสียหาย · ' +
+        'การแก้ไขคะแนนมีผลกับบันทึกใหม่เท่านั้น บันทึกเดิมยังคงคะแนน ณ วันที่บันทึกไว้เหมือนเดิม</div>' +
+    '</div>';
+
+  var input = el('rule-q');
+  if (input && RULEMGR.q) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+}
+
+function ruleRow(r) {
+  var sevText = ['', 'เบา', 'ปานกลาง', 'ร้ายแรง', 'ร้ายแรงมาก'][r.severity] || '—';
+  var sevClass = { 1: 'badge', 2: 'badge-warn', 3: 'badge-serious', 4: 'badge-crit' }[r.severity] || 'badge';
+  return '<tr' + (r.active ? '' : ' style="opacity:.55"') + '>' +
+    '<td class="mono small">' + esc(r.code) + '</td>' +
+    '<td class="mono small muted">' + esc(r.oldCode || '—') + '</td>' +
+    '<td><b>' + esc(r.name) + '</b>' +
+      (r.requiresEvidence ? ' <span class="badge">ต้องมีหลักฐาน</span>' : '') + '</td>' +
+    '<td class="num" style="font-weight:700;color:' +
+      (r.kind === 'ความดี' ? 'var(--series-1)' : 'var(--series-2)') + '">' +
+      (r.kind === 'ความดี' ? '+' : '−') + r.points + '</td>' +
+    '<td class="small">' + esc(r.category) + '</td>' +
+    (r.kind === 'ความผิด'
+      ? '<td><span class="badge ' + sevClass + '">' + esc(sevText) + '</span></td>'
+      : '<td class="small">' + (r.maxPerTerm ? r.maxPerTerm + ' ครั้ง' : 'ไม่จำกัด') + '</td>') +
+    '<td>' + (r.active ? '<span class="badge badge-good">ใช้งาน</span>'
+                       : '<span class="badge">ปิดใช้งาน</span>') + '</td>' +
+    '<td style="white-space:nowrap">' +
+      '<button class="btn btn-ghost btn-sm" onclick="openRuleForm(' + r.id + ')">แก้ไข</button>' +
+      '<button class="btn btn-ghost btn-sm" style="color:var(--critical)" onclick="deleteRule(' + r.id + ')">ลบ</button>' +
+    '</td></tr>';
+}
+
+function setRuleKind(kind) { RULEMGR.kind = kind; RULEMGR.q = ''; drawRulesTable(); }
+
+function openRuleForm(ruleId) {
+  var r = ruleId ? RULEMGR.list.filter(function (x) { return x.id === ruleId; })[0] : null;
+  var kind = r ? r.kind : RULEMGR.kind;
+  var isMerit = kind === 'ความดี';
+  var categories = {};
+  RULEMGR.list.forEach(function (x) { if (x.kind === kind && x.category) categories[x.category] = true; });
+
+  openModal(r ? 'แก้ไขหลักเกณฑ์ ' + r.code : 'เพิ่มหลักเกณฑ์' + (isMerit ? 'การทำความดี' : 'คะแนนไม่พึงประสงค์'),
+    '<div class="field"><label>ชื่อเกณฑ์</label>' +
+      '<textarea id="rf-name" style="min-height:60px">' + esc(r ? r.name : '') + '</textarea></div>' +
+    '<div class="row">' +
+      '<div class="field"><label>' + (isMerit ? 'คะแนนที่ได้' : 'คะแนนที่หัก') + '</label>' +
+        '<input id="rf-points" type="number" min="1" value="' + esc(r ? r.points : '') + '">' +
+        '<div class="help">ใส่เป็นจำนวนเต็มบวก' + (isMerit ? '' : ' ระบบจะหักให้เอง') + '</div></div>' +
+      '<div class="field"><label>รหัสเดิมของโรงเรียน</label>' +
+        '<input id="rf-oldcode" type="text" value="' + esc(r ? r.oldCode : '') + '">' +
+        '<div class="help">เลขรหัสในเอกสารเดิม ซ้ำกันได้ เว้นว่างได้</div></div>' +
+    '</div>' +
+    '<div class="field"><label>หมวด</label>' +
+      '<input id="rf-category" type="text" list="rf-cats" value="' + esc(r ? r.category : '') + '">' +
+      '<datalist id="rf-cats">' + Object.keys(categories).map(function (c) {
+        return '<option value="' + esc(c) + '">';
+      }).join('') + '</datalist></div>' +
+    (isMerit
+      ? '<div class="row">' +
+          '<div class="field"><label>คุณลักษณะอันพึงประสงค์</label>' +
+            '<select id="rf-trait">' + ['', 'รักชาติ ศาสน์ กษัตริย์', 'ซื่อสัตย์สุจริต', 'มีวินัย', 'ใฝ่เรียนรู้',
+              'อยู่อย่างพอเพียง', 'มุ่งมั่นในการทำงาน', 'รักความเป็นไทย', 'มีจิตสาธารณะ']
+              .map(function (t) {
+                return '<option value="' + esc(t) + '"' + (r && r.trait === t ? ' selected' : '') + '>' +
+                  (t || '— ไม่ระบุ —') + '</option>';
+              }).join('') + '</select></div>' +
+          '<div class="field"><label>เพดานครั้งต่อภาคเรียน</label>' +
+            '<input id="rf-cap" type="number" min="1" value="' + esc(r && r.maxPerTerm ? r.maxPerTerm : '') + '">' +
+            '<div class="help">เว้นว่าง = ไม่จำกัด · ตั้งไว้เพื่อกันคะแนนเฟ้อ</div></div>' +
+        '</div>'
+      : '<div class="row">' +
+          '<div class="field"><label>ระดับความรุนแรง</label>' +
+            '<select id="rf-severity">' +
+              ['', 1, 2, 3, 4].map(function (v) {
+                var label = v === '' ? '— คำนวณจากคะแนนให้อัตโนมัติ —'
+                  : v + ' · ' + ['', 'เบา', 'ปานกลาง', 'ร้ายแรง', 'ร้ายแรงมาก'][v];
+                return '<option value="' + v + '"' + (r && r.severity === v ? ' selected' : '') + '>' + label + '</option>';
+              }).join('') + '</select>' +
+            '<div class="help">ระดับ 3 ขึ้นไป ต้องให้ฝ่ายกิจการนักเรียนเป็นผู้พิจารณาเท่านั้น</div></div>' +
+          '<div class="field"><label>อ้างอิงระเบียบ</label>' +
+            '<input id="rf-legal" type="text" value="' + esc(r ? r.legalRef : '') + '"></div>' +
+        '</div>') +
+    '<div class="field"><label style="display:flex;gap:9px;align-items:center;font-weight:400">' +
+      '<input type="checkbox" id="rf-evidence" style="width:auto;min-height:0"' +
+        (r && r.requiresEvidence ? ' checked' : '') + '> บังคับให้แนบลิงก์หลักฐานทุกครั้งที่บันทึก</label></div>' +
+    '<div class="field"><label style="display:flex;gap:9px;align-items:center;font-weight:400">' +
+      '<input type="checkbox" id="rf-active" style="width:auto;min-height:0"' +
+        (!r || r.active ? ' checked' : '') + '> เปิดใช้งานเกณฑ์นี้</label></div>' +
+    '<input type="hidden" id="rf-kind" value="' + esc(kind) + '">' +
+    '<div id="rf-error"></div>',
+    '<button class="btn" onclick="closeModal()">ยกเลิก</button>' +
+    '<button class="btn btn-primary" id="rf-save">บันทึก</button>');
+
+  el('rf-save').onclick = function () {
+    var btn = this; busy(btn, true);
+    call('apiSaveRule', [S.token, {
+      id: r ? r.id : null,
+      kind: el('rf-kind').value,
+      name: el('rf-name').value,
+      points: el('rf-points').value,
+      oldCode: el('rf-oldcode').value,
+      category: el('rf-category').value,
+      trait: el('rf-trait') ? el('rf-trait').value : '',
+      severity: el('rf-severity') ? el('rf-severity').value : '',
+      legalRef: el('rf-legal') ? el('rf-legal').value : '',
+      maxPerTerm: el('rf-cap') ? el('rf-cap').value : '',
+      requiresEvidence: el('rf-evidence').checked,
+      active: el('rf-active').checked
+    }]).then(function (res) {
+      closeModal();
+      toast('บันทึกหลักเกณฑ์ ' + res.code + ' เรียบร้อย', 'ok');
+      renderRulesTab(el('admin-body'));
+    }).catch(function (e) {
+      busy(btn, false, 'บันทึก');
+      el('rf-error').innerHTML = '<div class="alert alert-error">⚠ ' + esc(e.message) + '</div>';
+    });
+  };
+}
+
+function deleteRule(ruleId) {
+  var r = RULEMGR.list.filter(function (x) { return x.id === ruleId; })[0];
+  confirmAction('ลบหลักเกณฑ์',
+    'ต้องการลบ "' + r.name + '" ใช่หรือไม่ ถ้าเกณฑ์นี้เคยถูกใช้บันทึกไปแล้ว ' +
+    'ระบบจะปิดการใช้งานแทนการลบ เพื่อรักษาประวัติของนักเรียนไว้',
+    function () {
+      call('apiDeleteRule', [S.token, ruleId]).then(function (res) {
+        toast(res.deleted ? 'ลบหลักเกณฑ์แล้ว'
+                          : 'ปิดการใช้งานแล้ว (มีบันทึกอ้างอิงอยู่ ' + res.used + ' รายการ)', 'ok');
+        renderRulesTab(el('admin-body'));
+      }).catch(function (e) { toast(e.message, 'err'); });
+    }, true);
+}
+
+/* ------------------------------------------------------------------ */
+/* 10. นำเข้าข้อมูล                                                     */
+/* ------------------------------------------------------------------ */
+
+var IMP = { types: [], typeId: null, csv: '', analysis: null };
+
+function renderImportTab(box) {
+  box.innerHTML = '<div class="card"><div class="skeleton" style="height:180px"></div></div>';
+  return call('apiImportTypes', [S.token]).then(function (types) {
+    IMP.types = types;
+    if (!types.length) {
+      box.innerHTML = '<div class="card"><div class="empty">คุณไม่มีสิทธิ์นำเข้าข้อมูลประเภทใด</div></div>';
+      return;
+    }
+    if (!IMP.typeId || !types.filter(function (t) { return t.id === IMP.typeId; }).length) {
+      IMP.typeId = types[0].id;
+    }
+    drawImportTab(box);
+  });
+}
+
+function drawImportTab(box) {
+  box = box || el('admin-body');
+  var t = IMP.types.filter(function (x) { return x.id === IMP.typeId; })[0];
+
+  box.innerHTML =
+    '<div class="card" style="margin-bottom:14px">' +
+      '<div class="card-head"><h3>เลือกประเภทข้อมูลที่ต้องการนำเข้า</h3></div>' +
+      '<div class="chips">' + IMP.types.map(function (x) {
+        return '<button class="chip' + (x.id === IMP.typeId ? ' on' : '') +
+          '" onclick="pickImportType(\'' + x.id + '\')">' + x.icon + ' ' + esc(x.name) + '</button>';
+      }).join('') + '</div>' +
+    '</div>' +
+
+    '<div class="grid grid-2">' +
+      '<div class="card">' +
+        '<div class="card-head"><h3>1. เตรียมไฟล์</h3>' +
+          '<div class="right"><button class="btn btn-sm" onclick="downloadTemplate(this)">⬇ ดาวน์โหลดแบบฟอร์ม</button></div>' +
+        '</div>' +
+        '<div class="alert alert-info">ℹ ' + esc(t.note) + '</div>' +
+        '<div class="table-wrap"><table class="data"><thead><tr>' +
+          '<th>ชื่อคอลัมน์</th><th>จำเป็น</th><th>คำอธิบาย</th></tr></thead><tbody>' +
+          t.columns.map(function (c) {
+            return '<tr><td><b>' + esc(c.key) + '</b>' +
+              (c.alias ? '<div class="small muted">ใช้ชื่ออื่นได้: ' + esc(c.alias) + '</div>' : '') + '</td>' +
+              '<td>' + (c.required ? '<span class="badge badge-crit">จำเป็น</span>'
+                                   : '<span class="small muted">ไม่บังคับ</span>') + '</td>' +
+              '<td class="small muted">' + esc(c.hint) + '</td></tr>';
+          }).join('') + '</tbody></table></div>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<div class="card-head"><h3>2. ใส่ข้อมูล</h3></div>' +
+        '<div class="field"><label>เลือกไฟล์ CSV จากเครื่อง</label>' +
+          '<input type="file" id="imp-file" accept=".csv,text/csv" onchange="readImportFile(this)">' +
+          '<div class="help">บันทึกไฟล์ Excel เป็น .csv ก่อน · ระบบรองรับทั้งภาษาไทยแบบ UTF-8 และ Windows-874</div></div>' +
+        '<div class="field"><label>หรือคัดลอกข้อมูลมาวางที่นี่</label>' +
+          '<textarea id="imp-csv" style="min-height:150px;font-family:ui-monospace,monospace;font-size:12.5px" ' +
+            'placeholder="วางข้อมูลจาก Excel หรือ Google Sheets ได้เลย (บรรทัดแรกต้องเป็นหัวตาราง)" ' +
+            'oninput="IMP.csv=this.value">' + esc(IMP.csv) + '</textarea></div>' +
+        '<button class="btn btn-primary btn-block" onclick="previewImport(this)">🔍 ตรวจสอบข้อมูลก่อนนำเข้า</button>' +
+        '<p class="small muted" style="margin:10px 0 0">ระบบจะยังไม่บันทึกอะไรลงฐานข้อมูล ' +
+          'จนกว่าคุณจะตรวจผลแล้วกดยืนยัน</p>' +
+      '</div>' +
+    '</div>' +
+    '<div id="imp-result" style="margin-top:14px"></div>';
+}
+
+function pickImportType(id) {
+  IMP.typeId = id; IMP.csv = ''; IMP.analysis = null;
+  drawImportTab();
+}
+
+/** อ่านไฟล์ CSV พร้อมเดารหัสอักขระ ไฟล์ไทยจาก Excel มักเป็น Windows-874 ไม่ใช่ UTF-8 */
+function readImportFile(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+
+  function load(encoding, onDone) {
+    var reader = new FileReader();
+    reader.onload = function () { onDone(String(reader.result || '')); };
+    reader.onerror = function () { toast('อ่านไฟล์ไม่สำเร็จ', 'err'); };
+    reader.readAsText(file, encoding);
+  }
+
+  load('utf-8', function (text) {
+    if (text.indexOf('�') >= 0) {
+      load('windows-874', function (thai) {
+        applyImportText(thai, file.name + ' (Windows-874)');
+      });
+    } else {
+      applyImportText(text, file.name);
+    }
+  });
+}
+
+function applyImportText(text, label) {
+  IMP.csv = text;
+  el('imp-csv').value = text;
+  toast('อ่านไฟล์ ' + label + ' แล้ว ' + (text.split('\n').length - 1) + ' บรรทัด', 'ok');
+}
+
+function downloadTemplate(btn) {
+  busy(btn, true);
+  call('apiImportTemplate', [S.token, IMP.typeId]).then(function (f) {
+    busy(btn, false, '⬇ ดาวน์โหลดแบบฟอร์ม');
+    // ใส่ BOM เพื่อให้ Excel เปิดไฟล์ภาษาไทยได้ถูกต้อง
+    downloadBase64(f.fileName, 'text/csv;charset=utf-8',
+      btoa(unescape(encodeURIComponent('﻿' + f.csv))));
+  }).catch(function (e) { busy(btn, false, '⬇ ดาวน์โหลดแบบฟอร์ม'); toast(e.message, 'err'); });
+}
+
+function previewImport(btn) {
+  var csv = (el('imp-csv').value || '').trim();
+  if (!csv) { toast('กรุณาใส่ข้อมูลก่อน', 'err'); return; }
+  IMP.csv = csv;
+  busy(btn, true);
+
+  call('apiImportPreview', [S.token, IMP.typeId, csv]).then(function (a) {
+    busy(btn, false, '🔍 ตรวจสอบข้อมูลก่อนนำเข้า');
+    IMP.analysis = a;
+    drawImportPreview(a);
+  }).catch(function (e) {
+    busy(btn, false, '🔍 ตรวจสอบข้อมูลก่อนนำเข้า');
+    el('imp-result').innerHTML = '<div class="card"><div class="alert alert-error">⚠ ' + esc(e.message) + '</div></div>';
+  });
+}
+
+function drawImportPreview(a) {
+  var s = a.summary;
+  var canImport = (s.create + s.update) > 0;
+  var badge = { create: 'badge-good', update: 'badge-warn', skip: 'badge', error: 'badge-crit' };
+  var label = { create: 'เพิ่มใหม่', update: 'อัปเดต', skip: 'ข้าม', error: 'ผิดพลาด' };
+
+  el('imp-result').innerHTML =
+    '<div class="card">' +
+      '<div class="card-head"><h3>ผลการตรวจสอบ — ' + esc(a.typeName) + '</h3>' +
+        '<span class="hint">ทั้งหมด ' + s.total + ' แถว</span></div>' +
+
+      '<div class="grid grid-4" style="margin-bottom:14px">' +
+        importStat('เพิ่มใหม่', s.create, 'var(--good)') +
+        importStat('อัปเดตของเดิม', s.update, 'var(--warning)') +
+        importStat('ข้าม', s.skip, 'var(--muted)') +
+        importStat('ผิดพลาด', s.error, s.error ? 'var(--critical)' : 'var(--muted)') +
+      '</div>' +
+
+      (a.unknownColumns.length
+        ? '<div class="alert alert-warn">⚠ มีคอลัมน์ที่ระบบไม่รู้จักและจะถูกข้ามไป: ' +
+          a.unknownColumns.map(esc).join(', ') + '</div>' : '') +
+      (s.error
+        ? '<div class="alert alert-error">⚠ มี ' + s.error + ' แถวที่นำเข้าไม่ได้ ' +
+          'ถ้ากดยืนยัน ระบบจะนำเข้าเฉพาะแถวที่ถูกต้อง แถวที่ผิดพลาดจะถูกข้ามไปทั้งหมด</div>' : '') +
+
+      '<div class="table-wrap" style="max-height:420px;overflow-y:auto"><table class="data"><thead><tr>' +
+        '<th>บรรทัด</th><th>สถานะ</th><th>ข้อมูล</th><th>ผลที่จะเกิดขึ้น</th></tr></thead><tbody>' +
+        a.preview.map(function (r) {
+          return '<tr><td class="num small muted">' + r.line + '</td>' +
+            '<td><span class="badge ' + badge[r.action] + '">' + label[r.action] + '</span></td>' +
+            '<td>' + esc(r.display || '—') + '</td>' +
+            '<td class="small' + (r.action === 'error' ? '' : ' muted') + '"' +
+              (r.action === 'error' ? ' style="color:var(--critical)"' : '') + '>' +
+              esc(r.message || '') + '</td></tr>';
+        }).join('') + '</tbody></table></div>' +
+      (a.truncated ? '<p class="small muted" style="margin-top:8px">แสดง ' + a.preview.length +
+        ' แถวแรกจากทั้งหมด ' + s.total + ' แถว</p>' : '') +
+
+      '<div style="display:flex;gap:9px;margin-top:16px;flex-wrap:wrap">' +
+        '<button class="btn btn-primary" onclick="commitImport(this)"' + (canImport ? '' : ' disabled') + '>' +
+          '✓ ยืนยันนำเข้า ' + (s.create + s.update) + ' แถว</button>' +
+        '<button class="btn" onclick="el(\'imp-result\').innerHTML=\'\'">ยกเลิก</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function importStat(label, value, color) {
+  return '<div style="background:var(--surface-2);border-radius:10px;padding:11px 13px">' +
+    '<div class="small muted">' + esc(label) + '</div>' +
+    '<div style="font-size:22px;font-weight:700;color:' + color + '">' + value + '</div></div>';
+}
+
+function commitImport(btn) {
+  var a = IMP.analysis;
+  confirmAction('ยืนยันนำเข้าข้อมูล',
+    'ระบบจะเพิ่ม ' + a.summary.create + ' แถว และอัปเดต ' + a.summary.update + ' แถว' +
+    (a.typeId.indexOf('_records') > 0
+      ? ' จากนั้นจะคำนวณคะแนนของนักเรียนที่เกี่ยวข้องใหม่ตามลำดับเวลาจริง' : '') +
+    ' ดำเนินการต่อหรือไม่',
+    function () {
+      busy(btn, true);
+      call('apiImportCommit', [S.token, IMP.typeId, IMP.csv]).then(function (res) {
+        el('imp-result').innerHTML =
+          '<div class="card"><div class="alert alert-info" style="font-size:14.5px">' +
+            '✓ <b>นำเข้า' + esc(res.typeName) + 'เรียบร้อย</b><br>' +
+            'เพิ่มใหม่ ' + res.created + ' แถว · อัปเดต ' + res.updated + ' แถว · ' +
+            'ข้าม ' + res.skipped + ' แถว · ผิดพลาด ' + res.errors + ' แถว' +
+            (res.recomputed ? '<br>คำนวณคะแนนใหม่ให้นักเรียน ' + res.recomputed + ' รายการ' : '') +
+          '</div>' +
+          '<button class="btn" onclick="adminTab(\'import\')">นำเข้าข้อมูลชุดต่อไป</button> ' +
+          '<button class="btn btn-primary" onclick="go(\'dashboard\')">ดูแดชบอร์ด</button></div>';
+        IMP.csv = ''; IMP.analysis = null;
+        toast('นำเข้าข้อมูลเรียบร้อย', 'ok');
+      }).catch(function (e) {
+        busy(btn, false, '✓ ยืนยันนำเข้า');
+        toast(e.message, 'err');
+      });
+    });
 }
 </script>

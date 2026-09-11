@@ -249,56 +249,131 @@ function publishLeaderboard_(actor) {
   return { count: rows.length, at: stamp };
 }
 
-/** ตัวช่วยซ่อมข้อมูล: คำนวณคะแนนคงเหลือใหม่ทั้งหมดจากบันทึกที่อนุมัติแล้ว */
+/**
+ * ตัวช่วยซ่อมข้อมูล: คำนวณบัญชีเดินคะแนนและยอดคงเหลือใหม่ทั้งระบบ
+ * จากบันทึกที่อนุมัติแล้วทั้งหมด เรียงตามเวลาที่เกิดเหตุจริง
+ */
 function rebuildAllBalances() {
-  var year = currentYear();
-  var initial = getSettingNumber('คะแนนตั้งต้น', 100);
+  return recomputeLedgerFor_(null);
+}
+
+/* ------------------------------------------------------------------ */
+/* คำนวณบัญชีคะแนนใหม่แบบเรียงตามเวลา                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * สร้างบัญชีเดินคะแนนและยอดคงเหลือใหม่จากบันทึกที่อนุมัติแล้ว โดยเรียงตามเวลาที่เกิดเหตุ
+ *
+ * จำเป็นต้องเรียงตามเวลา เพราะคะแนนความประพฤติมีเพดาน 100 ลำดับเหตุการณ์จึงมีผลต่อผลลัพธ์
+ * เช่น นักเรียนเหลือ 80 แล้วนำเข้าบันทึกความดี +10 ของเดือนก่อน
+ * ถ้าคิดตามลำดับที่บันทึกเข้าระบบจะได้ 90 แต่ที่ถูกต้องตามเวลาจริงคือ 80
+ * (ความดีเกิดก่อนตอนที่คะแนนยังเต็ม 100 จึงชนเพดานไม่เพิ่มคะแนน แล้วค่อยถูกหัก 20)
+ *
+ * @param pairs รายการ {studentId, year} ที่ต้องการคำนวณใหม่ ถ้าเป็น null = คำนวณใหม่ทั้งระบบ
+ */
+function recomputeLedgerFor_(pairs) {
+  var scope = null;
+  if (pairs) {
+    scope = {};
+    pairs.forEach(function (p) { scope[p.studentId + '|' + p.year] = true; });
+  }
+
+  var initial  = getSettingNumber('คะแนนตั้งต้น', 100);
   var maxScore = getSettingNumber('เพดานคะแนนความประพฤติ', 100);
   var minScore = getSettingNumber('คะแนนความประพฤติต่ำสุด', 0);
 
-  var state = {};
-  dbReadAll(SHEETS.STUDENTS).forEach(function (s) {
-    state[s['รหัส']] = {
-      conduct: initial, merit: 0, demerit: 0, meritCount: 0, demeritCount: 0,
-      lastMerit: '', lastDemerit: ''
-    };
+  function inScope(studentId, year) {
+    return !scope || scope[studentId + '|' + year];
+  }
+
+  // แถวที่ไม่เกี่ยวข้องกับการคำนวณรอบนี้ ให้คงไว้เหมือนเดิม
+  var keptLedger = dbReadAll(SHEETS.LEDGER).filter(function (l) {
+    return !inScope(l['รหัสนักเรียน(ระบบ)'], Number(l['ปีการศึกษา']));
+  });
+  var keptBalances = dbReadAll(SHEETS.BALANCES).filter(function (b) {
+    return !inScope(b['รหัสนักเรียน(ระบบ)'], Number(b['ปีการศึกษา']));
   });
 
-  var records = dbReadAll(SHEETS.RECORDS)
-    .filter(function (r) { return r['สถานะ'] === STATUS.APPROVED && Number(r['ปีการศึกษา']) === year; })
-    .sort(function (a, b) { return new Date(a['วันเวลาที่เกิดเหตุ']) - new Date(b['วันเวลาที่เกิดเหตุ']); });
+  var groups = {};
+  if (scope) Object.keys(scope).forEach(function (k) { groups[k] = []; });
 
-  records.forEach(function (r) {
-    var st = state[r['รหัสนักเรียน(ระบบ)']];
-    if (!st) return;
-    var p = Number(r['คะแนน']);
-    if (r['ประเภท'] === KIND.MERIT) {
-      st.merit += p;
-      st.conduct = Math.min(maxScore, st.conduct + p);
-      st.meritCount++;
-      st.lastMerit = r['วันเวลาที่เกิดเหตุ'];
-    } else {
-      st.conduct = Math.max(minScore, st.conduct - p);
-      st.demerit += p;
-      st.demeritCount++;
-      st.lastDemerit = r['วันเวลาที่เกิดเหตุ'];
-    }
+  dbReadAll(SHEETS.RECORDS).forEach(function (r) {
+    if (r['สถานะ'] !== STATUS.APPROVED) return;
+    var key = r['รหัสนักเรียน(ระบบ)'] + '|' + Number(r['ปีการศึกษา']);
+    if (scope && !scope[key]) return;
+    (groups[key] = groups[key] || []).push(r);
   });
 
-  var sh = getSheet_(SHEETS.BALANCES);
-  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, sh.getLastColumn()).clearContent();
-  dbClearCache(SHEETS.BALANCES);
+  // นักเรียนที่ยังไม่มีบันทึกใด ๆ ก็ต้องมียอดตั้งต้นของปีการศึกษาปัจจุบัน
+  if (!scope) {
+    var year = currentYear();
+    dbReadAll(SHEETS.STUDENTS).forEach(function (s) {
+      var key = s['รหัส'] + '|' + year;
+      if (!groups[key]) groups[key] = [];
+    });
+  }
 
-  var rows = Object.keys(state).map(function (id) {
-    var st = state[id];
-    return {
-      'รหัสนักเรียน(ระบบ)': Number(id), 'ปีการศึกษา': year,
-      'คะแนนความประพฤติ': st.conduct, 'คะแนนความดีสะสม': st.merit, 'คะแนนที่ถูกหัก': st.demerit,
-      'ครั้งที่ทำความดี': st.meritCount, 'ครั้งที่ทำผิด': st.demeritCount,
-      'ความดีล่าสุด': st.lastMerit, 'ความผิดล่าสุด': st.lastDemerit,
-      'ระดับความเสี่ยง': riskLevelOf_(st.conduct).level, 'ปรับปรุงเมื่อ': nowStr()
-    };
+  var stamp = nowStr();
+  var newLedger = [], newBalances = [];
+
+  Object.keys(groups).forEach(function (key) {
+    var parts = key.split('|');
+    var studentId = isNaN(Number(parts[0])) ? parts[0] : Number(parts[0]);
+    var year = Number(parts[1]);
+
+    var records = groups[key].slice().sort(function (a, b) {
+      return new Date(a['วันเวลาที่เกิดเหตุ']) - new Date(b['วันเวลาที่เกิดเหตุ']);
+    });
+
+    var conduct = initial, merit = 0, demerit = 0;
+    var meritCount = 0, demeritCount = 0, lastMerit = '', lastDemerit = '';
+
+    newLedger.push({
+      'รหัสนักเรียน(ระบบ)': studentId, 'ปีการศึกษา': year, 'บัญชี': ACCOUNT.CONDUCT,
+      'ประเภทรายการ': 'คะแนนตั้งต้น', 'คะแนนที่เปลี่ยน': initial, 'ยอดคงเหลือ': initial,
+      'อ้างอิงบันทึก': '', 'เหตุผล': 'คะแนนความประพฤติตั้งต้นเมื่อแรกเข้า',
+      'ผู้ทำรายการ': '(ระบบ)', 'เมื่อ': stamp
+    });
+
+    records.forEach(function (r) {
+      var points = Number(r['คะแนน']);
+      var actor = r['ผู้พิจารณา'] || r['ผู้บันทึก'] || '(ระบบ)';
+
+      if (r['ประเภท'] === KIND.MERIT) {
+        merit += points;
+        newLedger.push(ledgerRow_(studentId, year, ACCOUNT.MERIT, 'ความดี', points, merit,
+          r['เลขที่บันทึก'], 'คะแนนความดีตามบันทึก ' + r['เลขที่บันทึก'], actor));
+
+        var after = Math.min(maxScore, conduct + points);
+        if (after !== conduct) {
+          newLedger.push(ledgerRow_(studentId, year, ACCOUNT.CONDUCT, 'ความดี', after - conduct, after,
+            r['เลขที่บันทึก'], 'คืนคะแนนความประพฤติจากการทำความดี', actor));
+          conduct = after;
+        }
+        meritCount++;
+        lastMerit = r['วันเวลาที่เกิดเหตุ'];
+      } else {
+        var afterDemerit = Math.max(minScore, conduct - points);
+        newLedger.push(ledgerRow_(studentId, year, ACCOUNT.CONDUCT, 'ความผิด',
+          afterDemerit - conduct, afterDemerit, r['เลขที่บันทึก'],
+          'หักคะแนนตามบันทึก ' + r['เลขที่บันทึก'], actor));
+        conduct = afterDemerit;
+        demerit += points;
+        demeritCount++;
+        lastDemerit = r['วันเวลาที่เกิดเหตุ'];
+      }
+    });
+
+    newBalances.push({
+      'รหัสนักเรียน(ระบบ)': studentId, 'ปีการศึกษา': year,
+      'คะแนนความประพฤติ': conduct, 'คะแนนความดีสะสม': merit, 'คะแนนที่ถูกหัก': demerit,
+      'ครั้งที่ทำความดี': meritCount, 'ครั้งที่ทำผิด': demeritCount,
+      'ความดีล่าสุด': lastMerit, 'ความผิดล่าสุด': lastDemerit,
+      'ระดับความเสี่ยง': riskLevelOf_(conduct).level, 'ปรับปรุงเมื่อ': stamp
+    });
   });
-  dbInsertMany(SHEETS.BALANCES, rows);
-  return rows.length;
+
+  dbReplaceAll(SHEETS.LEDGER, keptLedger.concat(newLedger));
+  dbReplaceAll(SHEETS.BALANCES, keptBalances.concat(newBalances));
+  return newBalances.length;
 }

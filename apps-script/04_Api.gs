@@ -280,7 +280,8 @@ function apiListRules(token) {
       .filter(function (r) { return String(r['ใช้งาน']) === 'ใช่'; })
       .map(function (r) {
         return {
-          id: r['รหัส'], code: r['รหัสเกณฑ์'], category: r['หมวด'], kind: r['ประเภท'],
+          id: r['รหัส'], code: r['รหัสเกณฑ์'], oldCode: String(r['รหัสเดิม'] || ''),
+          category: r['หมวด'], kind: r['ประเภท'],
           name: r['ชื่อเกณฑ์'], points: Number(r['คะแนน']),
           severity: r['ระดับความรุนแรง'] === '' ? null : Number(r['ระดับความรุนแรง']),
           trait: r['คุณลักษณะอันพึงประสงค์'],
@@ -327,8 +328,7 @@ function apiCreateRecord(token, payload) {
     }
 
     var occurredAt = payload.occurredAt ? String(payload.occurredAt) : nowStr();
-    var seq = dbReadAll(SHEETS.RECORDS).length + 1;
-    var recordNo = 'BR-' + year + '-' + ('000000' + seq).slice(-6);
+    var recordNo = nextRecordNo_(year);
 
     var record = {
       'เลขที่บันทึก': recordNo,
@@ -576,68 +576,123 @@ function apiSaveStudent(token, payload) {
   });
 }
 
-/**
- * นำเข้ารายชื่อนักเรียนจากข้อความ CSV
- * คอลัมน์: รหัสนักเรียน, คำนำหน้า, ชื่อ, นามสกุล, เพศ, ระดับชั้น, ห้อง, เลขที่,
- *          ยินยอมเผยแพร่, ชื่อผู้ปกครอง, โทรผู้ปกครอง
- */
-function apiImportStudents(token, csvText) {
-  return safeCall_(function () {
-    var user = requirePermission_(token, 'student.manage');
-    var rows;
-    try {
-      rows = Utilities.parseCsv(String(csvText || '').trim());
-    } catch (e) {
-      throw new Error('อ่านไฟล์ CSV ไม่สำเร็จ: ' + e.message);
-    }
-    if (!rows || rows.length < 2) throw new Error('ไฟล์ต้องมีบรรทัดหัวตารางและข้อมูลอย่างน้อย 1 แถว');
-
-    var headers = rows[0].map(function (h) { return String(h).trim(); });
-    function col(row, name) {
-      var i = headers.indexOf(name);
-      return i >= 0 ? String(row[i]).trim() : '';
-    }
-
-    var existing = {};
-    dbReadAll(SHEETS.STUDENTS).forEach(function (s) { existing[String(s['รหัสนักเรียน'])] = true; });
-
-    var toInsert = [], errors = [], skipped = 0;
-    for (var i = 1; i < rows.length; i++) {
-      if (rows[i].join('').trim() === '') continue;
-      var code = col(rows[i], 'รหัสนักเรียน');
-      var grade = Number(col(rows[i], 'ระดับชั้น'));
-      var room = Number(col(rows[i], 'ห้อง'));
-
-      if (!code) { errors.push('บรรทัด ' + (i + 1) + ': ไม่มีรหัสนักเรียน'); continue; }
-      if (existing[code]) { skipped++; continue; }
-      if (!(grade >= 1 && grade <= 6)) { errors.push('บรรทัด ' + (i + 1) + ': ระดับชั้นไม่ถูกต้อง'); continue; }
-      if (!(room >= 1)) { errors.push('บรรทัด ' + (i + 1) + ': ห้องไม่ถูกต้อง'); continue; }
-
-      existing[code] = true;
-      toInsert.push({
-        'รหัสนักเรียน': code, 'คำนำหน้า': col(rows[i], 'คำนำหน้า'),
-        'ชื่อ': col(rows[i], 'ชื่อ'), 'นามสกุล': col(rows[i], 'นามสกุล'),
-        'เพศ': col(rows[i], 'เพศ') || 'ไม่ระบุ', 'ระดับชั้น': grade, 'ห้อง': room,
-        'เลขที่': col(rows[i], 'เลขที่'), 'ชั้นแรกเข้า': grade <= 3 ? 1 : 4,
-        'ปีแรกเข้า': currentYear(), 'สถานะ': 'ปกติ',
-        'ยินยอมเผยแพร่': col(rows[i], 'ยินยอมเผยแพร่') === 'ใช่' ? 'ใช่' : 'ไม่',
-        'ชื่อผู้ปกครอง': col(rows[i], 'ชื่อผู้ปกครอง'), 'โทรผู้ปกครอง': col(rows[i], 'โทรผู้ปกครอง'),
-        'LINE ผู้ปกครอง': '', 'สร้างเมื่อ': nowStr()
-      });
-    }
-
-    dbInsertMany(SHEETS.STUDENTS, toInsert);
-    if (toInsert.length) rebuildAllBalances();
-    logAudit(user, 'นำเข้ารายชื่อนักเรียน', '', 'เพิ่ม ' + toInsert.length + ' คน');
-    return { inserted: toInsert.length, skipped: skipped, errors: errors.slice(0, 20) };
-  });
-}
-
 function apiRebuildBalances(token) {
   return safeCall_(function () {
     var user = requirePermission_(token, 'settings.manage');
     var count = rebuildAllBalances();
     logAudit(user, 'คำนวณคะแนนใหม่ทั้งระบบ', '', count + ' คน');
     return { count: count };
+  });
+}
+
+/** ออกเลขที่บันทึกถัดไปของปีการศึกษาที่ระบุ นับจากเลขสูงสุดที่เคยออกไว้ */
+function nextRecordNo_(year) {
+  var max = 0;
+  dbReadAll(SHEETS.RECORDS).forEach(function (r) {
+    var m = String(r['เลขที่บันทึก']).match(/^BR-(\d+)-(\d+)$/);
+    if (m && Number(m[1]) === Number(year)) max = Math.max(max, Number(m[2]));
+  });
+  return 'BR-' + year + '-' + ('000000' + (max + 1)).slice(-6);
+}
+
+/* ------------------------------------------------------------------ */
+/* จัดการหลักเกณฑ์คะแนน                                                 */
+/* ------------------------------------------------------------------ */
+
+function apiListAllRules(token, kind) {
+  return safeCall_(function () {
+    requirePermission_(token, 'rule.manage');
+    return dbReadAll(SHEETS.RULES)
+      .filter(function (r) { return !kind || r['ประเภท'] === kind; })
+      .map(function (r) {
+        return {
+          id: r['รหัส'], code: r['รหัสเกณฑ์'], oldCode: String(r['รหัสเดิม'] || ''),
+          category: r['หมวด'], kind: r['ประเภท'], name: r['ชื่อเกณฑ์'],
+          points: Number(r['คะแนน']),
+          severity: r['ระดับความรุนแรง'] === '' ? null : Number(r['ระดับความรุนแรง']),
+          trait: r['คุณลักษณะอันพึงประสงค์'],
+          requiresEvidence: String(r['ต้องมีหลักฐาน']) === 'ใช่',
+          maxPerTerm: r['เพดานครั้ง/ภาคเรียน'] === '' ? null : Number(r['เพดานครั้ง/ภาคเรียน']),
+          legalRef: r['อ้างอิงระเบียบ'],
+          active: String(r['ใช้งาน']) === 'ใช่',
+          usageCount: 0
+        };
+      })
+      .sort(function (a, b) { return String(a.code).localeCompare(String(b.code)); });
+  });
+}
+
+function apiSaveRule(token, payload) {
+  return safeCall_(function () {
+    var user = requirePermission_(token, 'rule.manage');
+    var name = String(payload.name || '').trim();
+    if (!name) throw new Error('กรุณากรอกชื่อเกณฑ์');
+
+    var points = Number(payload.points);
+    if (!(points > 0)) throw new Error('คะแนนต้องเป็นจำนวนเต็มบวก');
+    if (payload.kind !== KIND.MERIT && payload.kind !== KIND.DEMERIT) throw new Error('ประเภทเกณฑ์ไม่ถูกต้อง');
+
+    var severity = '';
+    if (payload.kind === KIND.DEMERIT) {
+      severity = Number(payload.severity) || severityFromPoints(points);
+      if (severity < 1 || severity > 4) severity = severityFromPoints(points);
+    }
+
+    var fields = {
+      'รหัสเดิม': String(payload.oldCode || ''),
+      'หมวด': payload.category || 'ทั่วไป',
+      'ประเภท': payload.kind,
+      'ชื่อเกณฑ์': name,
+      'คะแนน': points,
+      'ระดับความรุนแรง': severity,
+      'คุณลักษณะอันพึงประสงค์': payload.trait || '',
+      'ต้องมีหลักฐาน': payload.requiresEvidence ? 'ใช่' : 'ไม่',
+      'เพดานครั้ง/ภาคเรียน': payload.maxPerTerm || '',
+      'อ้างอิงระเบียบ': payload.legalRef || '',
+      'ใช้งาน': payload.active === false ? 'ไม่' : 'ใช่'
+    };
+
+    if (payload.id) {
+      var rule = dbFind(SHEETS.RULES, function (r) { return r['รหัส'] === payload.id; });
+      if (!rule) throw new Error('ไม่พบหลักเกณฑ์ที่ต้องการแก้ไข');
+      dbUpdateRow(SHEETS.RULES, rule._row, fields);
+      logAudit(user, 'แก้ไขหลักเกณฑ์', rule['รหัสเกณฑ์'], name + ' ' + points + ' คะแนน');
+      return { id: payload.id, code: rule['รหัสเกณฑ์'] };
+    }
+
+    var prefix = payload.kind === KIND.MERIT ? 'ด-' : 'ผ-';
+    var maxSeq = 0;
+    dbReadAll(SHEETS.RULES).forEach(function (r) {
+      var m = String(r['รหัสเกณฑ์']).match(new RegExp('^' + prefix + '(\\d+)$'));
+      if (m) maxSeq = Math.max(maxSeq, Number(m[1]));
+    });
+    fields['รหัสเกณฑ์'] = prefix + pad2_(maxSeq + 1);
+
+    var created = dbInsert(SHEETS.RULES, fields);
+    logAudit(user, 'เพิ่มหลักเกณฑ์', fields['รหัสเกณฑ์'], name + ' ' + points + ' คะแนน');
+    return { id: created['รหัส'], code: fields['รหัสเกณฑ์'] };
+  });
+}
+
+/**
+ * ลบหลักเกณฑ์ — ถ้าเคยถูกใช้บันทึกไปแล้วจะไม่ลบจริง แต่ปิดการใช้งานแทน
+ * เพื่อไม่ให้ประวัติของนักเรียนที่อ้างอิงเกณฑ์นี้เสียหาย
+ */
+function apiDeleteRule(token, ruleId) {
+  return safeCall_(function () {
+    var user = requirePermission_(token, 'rule.manage');
+    var rule = dbFind(SHEETS.RULES, function (r) { return r['รหัส'] === ruleId; });
+    if (!rule) throw new Error('ไม่พบหลักเกณฑ์ที่ต้องการลบ');
+
+    var used = dbFilter(SHEETS.RECORDS, function (r) { return r['รหัสเกณฑ์(ระบบ)'] === ruleId; }).length;
+    if (used) {
+      dbUpdateRow(SHEETS.RULES, rule._row, { 'ใช้งาน': 'ไม่' });
+      logAudit(user, 'ปิดการใช้งานหลักเกณฑ์', rule['รหัสเกณฑ์'], 'มีบันทึกอ้างอิงอยู่ ' + used + ' รายการ');
+      return { deleted: false, deactivated: true, used: used };
+    }
+
+    dbDeleteRow(SHEETS.RULES, rule._row);
+    logAudit(user, 'ลบหลักเกณฑ์', rule['รหัสเกณฑ์'], rule['ชื่อเกณฑ์']);
+    return { deleted: true, deactivated: false, used: 0 };
   });
 }

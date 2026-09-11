@@ -236,3 +236,84 @@ function logAudit(user, action, target, detail) {
     console.error('บันทึก audit ไม่สำเร็จ: ' + e.message);
   }
 }
+
+/** เขียนทับข้อมูลทั้งชีต (เก็บหัวตารางไว้) ใช้ตอนคำนวณบัญชีคะแนนใหม่ */
+function dbReplaceAll(sheetName, objects) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    var sh = getSheet_(sheetName);
+    var headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+    if (sh.getLastRow() > 1) {
+      sh.getRange(2, 1, sh.getLastRow() - 1, headers.length).clearContent();
+    }
+    if (objects.length) {
+      var hasId = headers.indexOf('รหัส') >= 0;
+      var rows = objects.map(function (obj, i) {
+        if (hasId) obj['รหัส'] = i + 1;
+        return headers.map(function (h) {
+          return (obj[h] === undefined || obj[h] === null) ? '' : obj[h];
+        });
+      });
+      sh.getRange(2, 1, rows.length, headers.length).setValues(rows);
+    }
+    delete _memCache[sheetName];
+    return objects.length;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * ปีการศึกษาไทยของวันที่ที่ระบุ (ปีการศึกษาเริ่ม 16 พฤษภาคม ถึง 31 มีนาคมปีถัดไป)
+ * เช่น 20 มิ.ย. 2026 -> ปีการศึกษา 2569, 15 ก.พ. 2027 -> ปีการศึกษา 2569
+ */
+function academicYearOf(value) {
+  var d = toDate_(value);
+  if (!d) return currentYear();
+  var be = d.getFullYear() + 543;
+  return d.getMonth() + 1 >= 5 ? be : be - 1;
+}
+
+/** ภาคเรียนของวันที่ที่ระบุ (พ.ค.–ต.ค. = ภาค 1, พ.ย.–เม.ย. = ภาค 2) */
+function termOf(value) {
+  var d = toDate_(value);
+  if (!d) return currentTerm();
+  var m = d.getMonth() + 1;
+  return (m >= 5 && m <= 10) ? 1 : 2;
+}
+
+/**
+ * อ่านวันที่จากข้อความหลายรูปแบบที่โรงเรียนมักใช้ คืนค่าเป็น 'yyyy-MM-dd HH:mm:ss' (ค.ศ.)
+ * รองรับ  2026-06-10, 2026-06-10 09:30, 10/06/2569, 10/6/2026, 10-06-2569
+ * ปีตั้งแต่ 2400 ขึ้นไปถือว่าเป็น พ.ศ. ระบบจะลบ 543 ให้อัตโนมัติ
+ */
+function parseFlexibleDate(value) {
+  if (!value && value !== 0) return null;
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : Utilities.formatDate(value, APP.TZ, 'yyyy-MM-dd HH:mm:ss');
+  }
+
+  var text = String(value).trim();
+  if (!text) return null;
+
+  var time = '00:00:00';
+  var timeMatch = text.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (timeMatch) {
+    time = ('0' + timeMatch[1]).slice(-2) + ':' + timeMatch[2] + ':' + (timeMatch[3] || '00');
+    text = text.replace(timeMatch[0], '').trim();
+  }
+
+  var y, m, d;
+  var iso = text.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  var dmy = text.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+
+  if (iso)      { y = +iso[1]; m = +iso[2]; d = +iso[3]; }
+  else if (dmy) { d = +dmy[1]; m = +dmy[2]; y = +dmy[3]; }
+  else return null;
+
+  if (y >= 2400) y -= 543;                       // แปลง พ.ศ. เป็น ค.ศ.
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+
+  return y + '-' + ('0' + m).slice(-2) + '-' + ('0' + d).slice(-2) + ' ' + time;
+}
