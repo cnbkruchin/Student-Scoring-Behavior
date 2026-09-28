@@ -3,9 +3,19 @@ const fs = require('fs'), path = require('path'), vm = require('vm');
 require('./mock.js');
 console.error = function () {};
 
-const dir = require('path').join(__dirname, '..', 'apps-script');
-fs.readdirSync(dir).filter(f => f.endsWith('.gs')).sort()
-  .forEach(f => vm.runInThisContext(fs.readFileSync(path.join(dir, f), 'utf8'), { filename: f }));
+// รันด้วย --bundle เพื่อทดสอบไฟล์รวมใน dist/ แทนไฟล์ต้นฉบับ
+// ใช้ยืนยันว่าไฟล์ที่เอาไปติดตั้งจริงทำงานเหมือนต้นฉบับทุกประการ
+const useBundle = process.argv.indexOf('--bundle') >= 0;
+if (useBundle) {
+  const bundle = path.join(__dirname, '..', 'dist', 'Code.gs');
+  if (!fs.existsSync(bundle)) throw new Error('ยังไม่มี dist/Code.gs กรุณารัน node build/bundle.js ก่อน');
+  vm.runInThisContext(fs.readFileSync(bundle, 'utf8'), { filename: 'dist/Code.gs' });
+  console.log('(ทดสอบไฟล์รวม dist/Code.gs)');
+} else {
+  const dir = path.join(__dirname, '..', 'apps-script');
+  fs.readdirSync(dir).filter(f => f.endsWith('.gs')).sort()
+    .forEach(f => vm.runInThisContext(fs.readFileSync(path.join(dir, f), 'utf8'), { filename: f }));
+}
 
 let pass = 0, fail = 0;
 function check(label, actual, expected) {

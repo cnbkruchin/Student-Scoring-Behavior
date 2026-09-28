@@ -1,0 +1,2685 @@
+<!-- ========================================================================
+     ระบบคะแนนความประพฤตินักเรียน โรงเรียนจุนวิทยาคม — หน้าเว็บทั้งหมด
+     ไฟล์นี้สร้างอัตโนมัติจาก  node build/bundle.js  — อย่าแก้ไขไฟล์นี้โดยตรง
+     รวมจาก: Index.html, Style.html, Script.html, ScriptCharts.html, ScriptViews.html
+     ======================================================================== -->
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#184f95">
+  <title>ระบบคะแนนความประพฤตินักเรียน</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700&display=swap" rel="stylesheet">
+
+<!-- ================================================================== -->
+<!-- Style.html -->
+<!-- ================================================================== -->
+<style>
+/* ==================================================================
+   ระบบคะแนนความประพฤตินักเรียน — ระบบดีไซน์
+   สีชุดข้อมูลผ่านการตรวจ CVD (ตาบอดสี) แล้ว: น้ำเงิน #2a78d6 คู่ ส้ม #eb6834
+   ================================================================== */
+
+:root {
+  color-scheme: light;
+  --bg:        #f9f9f7;
+  --surface:   #fcfcfb;
+  --surface-2: #f2f1ed;
+  --surface-3: #e8eef7;
+  --ink:       #0b0b0b;
+  --ink-2:     #52514e;
+  --muted:     #898781;
+  --line:      #e1e0d9;
+  --line-2:    #c3c2b7;
+
+  --brand:     #184f95;
+  --brand-2:   #2a78d6;
+  --brand-soft:#e8f0fc;
+
+  --series-1:  #2a78d6;   /* ความดี */
+  --series-2:  #eb6834;   /* ความผิด */
+
+  --good:      #0ca30c;
+  --warning:   #fab219;
+  --serious:   #ec835a;
+  --critical:  #d03b3b;
+  --good-soft: #e6f6e6;
+  --warn-soft: #fdf3dc;
+  --crit-soft: #fbe9e9;
+
+  --radius:    14px;
+  --radius-sm: 10px;
+  --shadow:    0 1px 2px rgba(11,11,11,.05), 0 4px 16px rgba(11,11,11,.05);
+  --shadow-lg: 0 8px 32px rgba(11,11,11,.14);
+  --nav-w:     248px;
+  --font: "Sarabun", "TH Sarabun New", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg:        #0d0d0d;
+    --surface:   #1a1a19;
+    --surface-2: #242422;
+    --surface-3: #1e2836;
+    --ink:       #ffffff;
+    --ink-2:     #c3c2b7;
+    --muted:     #898781;
+    --line:      #2c2c2a;
+    --line-2:    #383835;
+    --brand:     #3987e5;
+    --brand-2:   #3987e5;
+    --brand-soft:#16263c;
+    --series-1:  #3987e5;
+    --series-2:  #d95926;
+    --good-soft: #122812;
+    --warn-soft: #2e2513;
+    --crit-soft: #2e1616;
+    --shadow:    0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3);
+    --shadow-lg: 0 8px 32px rgba(0,0,0,.55);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+h1, h2, h3, h4 { margin: 0; font-weight: 700; line-height: 1.3; }
+p { margin: 0 0 .6em; }
+a { color: var(--brand-2); }
+
+/* ---------------- โครงหน้า ---------------- */
+.app { display: flex; min-height: 100vh; }
+
+.sidebar {
+  width: var(--nav-w);
+  flex: 0 0 var(--nav-w);
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  padding: 18px 12px;
+  position: sticky; top: 0; height: 100vh;
+  display: flex; flex-direction: column; gap: 4px;
+  overflow-y: auto;
+}
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px 16px; }
+.brand-mark {
+  width: 38px; height: 38px; border-radius: 11px; flex: 0 0 38px;
+  background: linear-gradient(140deg, var(--brand-2), var(--brand));
+  color: #fff; display: grid; place-items: center; font-size: 19px;
+}
+.brand-text { min-width: 0; }
+.brand-text b { display: block; font-size: 14.5px; line-height: 1.25; }
+.brand-text span { font-size: 12px; color: var(--muted); }
+
+.navlink {
+  display: flex; align-items: center; gap: 11px;
+  padding: 10px 12px; border-radius: var(--radius-sm);
+  color: var(--ink-2); text-decoration: none; font-size: 14.5px;
+  border: none; background: none; width: 100%; cursor: pointer;
+  font-family: inherit; text-align: left;
+}
+.navlink:hover { background: var(--surface-2); color: var(--ink); }
+.navlink.active { background: var(--brand-soft); color: var(--brand); font-weight: 600; }
+.navlink .ico { font-size: 17px; width: 22px; text-align: center; }
+.navlink .pill {
+  margin-left: auto; background: var(--critical); color: #fff;
+  font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 20px;
+}
+.nav-sep { height: 1px; background: var(--line); margin: 10px 8px; }
+.nav-foot { margin-top: auto; padding: 12px 8px 0; font-size: 12px; color: var(--muted); }
+
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 22px; background: var(--surface);
+  border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 30;
+}
+.topbar h1 { font-size: 19px; }
+.topbar .sub { font-size: 12.5px; color: var(--muted); }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+.avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--brand-soft); color: var(--brand);
+  display: grid; place-items: center; font-weight: 700; font-size: 14px; flex: 0 0 36px;
+}
+.who { text-align: right; line-height: 1.25; }
+.who b { font-size: 13.5px; display: block; }
+.who span { font-size: 11.5px; color: var(--muted); }
+
+.content { padding: 22px; max-width: 1280px; width: 100%; }
+.mobile-nav, .mobile-bar { display: none; }
+
+/* ---------------- การ์ด ---------------- */
+.card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow);
+}
+.card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.card-head h3 { font-size: 15.5px; }
+.card-head .hint { font-size: 12.5px; color: var(--muted); font-weight: 400; }
+.card-head .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+.grid { display: grid; gap: 16px; align-items: start; }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-2 { grid-template-columns: repeat(2, 1fr); }
+.span-2 { grid-column: span 2; }
+
+/* ---------------- ตัวเลขสรุป ---------------- */
+.stat { display: flex; flex-direction: column; gap: 3px; }
+.stat .label { font-size: 12.5px; color: var(--ink-2); display: flex; align-items: center; gap: 6px; }
+.stat .value { font-size: 30px; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+.stat .unit { font-size: 14px; font-weight: 500; color: var(--muted); }
+.stat .foot { font-size: 12px; color: var(--muted); }
+.stat-icon {
+  width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+  font-size: 15px; background: var(--surface-2);
+}
+
+/* ---------------- ปุ่ม ---------------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 9px 16px; border-radius: var(--radius-sm); border: 1px solid var(--line-2);
+  background: var(--surface); color: var(--ink); font-family: inherit;
+  font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none;
+  transition: background .12s, border-color .12s, transform .06s;
+  min-height: 40px;
+}
+.btn:hover { background: var(--surface-2); }
+.btn:active { transform: translateY(1px); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.btn-primary:hover { background: var(--brand-2); border-color: var(--brand-2); }
+.btn-good { background: var(--good); border-color: var(--good); color: #fff; }
+.btn-good:hover { filter: brightness(1.08); background: var(--good); }
+.btn-danger { background: var(--critical); border-color: var(--critical); color: #fff; }
+.btn-danger:hover { filter: brightness(1.08); background: var(--critical); }
+.btn-ghost { background: none; border-color: transparent; color: var(--ink-2); }
+.btn-ghost:hover { background: var(--surface-2); }
+.btn-sm { padding: 6px 11px; font-size: 13px; min-height: 32px; }
+.btn-block { width: 100%; }
+
+/* ---------------- ฟอร์ม ---------------- */
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: var(--ink-2); }
+.field .help { font-size: 12px; color: var(--muted); margin-top: 4px; }
+input[type=text], input[type=password], input[type=number], input[type=search],
+input[type=date], input[type=datetime-local], select, textarea {
+  width: 100%; padding: 10px 12px; font-family: inherit; font-size: 15px;
+  border: 1px solid var(--line-2); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--ink); min-height: 42px;
+}
+textarea { min-height: 84px; resize: vertical; line-height: 1.5; }
+input:focus, select:focus, textarea:focus {
+  outline: none; border-color: var(--brand-2); box-shadow: 0 0 0 3px var(--brand-soft);
+}
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.row > * { flex: 1; min-width: 140px; }
+
+/* ---------------- ป้ายสถานะ ---------------- */
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px; border-radius: 20px; font-size: 12.5px; font-weight: 600;
+  background: var(--surface-2); color: var(--ink-2); white-space: nowrap;
+}
+.badge-merit   { background: var(--brand-soft); color: var(--brand); }
+.badge-demerit { background: #fdeee7; color: #a8410f; }
+.badge-good    { background: var(--good-soft); color: #056b05; }
+.badge-warn    { background: var(--warn-soft); color: #8a6100; }
+.badge-serious { background: #fdeee7; color: #a8410f; }
+.badge-crit    { background: var(--crit-soft); color: #9c2020; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .badge-demerit { background: #2e1c13; color: #f0a17c; }
+  :root:not([data-theme="light"]) .badge-good    { color: #6ede6e; }
+  :root:not([data-theme="light"]) .badge-warn    { color: #f5cd6b; }
+  :root:not([data-theme="light"]) .badge-serious { background: #2e1c13; color: #f0a17c; }
+  :root:not([data-theme="light"]) .badge-crit    { color: #f08a8a; }
+}
+
+/* ---------------- ตาราง ---------------- */
+.table-wrap { overflow-x: auto; margin: 0 -18px; padding: 0 18px; }
+table.data { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.data th {
+  text-align: left; font-size: 12.5px; color: var(--ink-2); font-weight: 600;
+  padding: 9px 12px; border-bottom: 1px solid var(--line-2); white-space: nowrap;
+}
+table.data td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.data tbody tr:hover { background: var(--surface-2); }
+table.data td.num, table.data th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.clickable { cursor: pointer; }
+
+/* ---------------- รายการอันดับ ---------------- */
+.rank-item { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+.rank-item:last-child { border-bottom: none; }
+.rank-no {
+  width: 28px; height: 28px; flex: 0 0 28px; border-radius: 9px;
+  display: grid; place-items: center; font-weight: 700; font-size: 13px;
+  background: var(--surface-2); color: var(--ink-2); font-variant-numeric: tabular-nums;
+}
+.rank-1 { background: #fdf3dc; color: #8a6100; }
+.rank-2 { background: #eeeeea; color: #56554f; }
+.rank-3 { background: #f8e7dc; color: #8a4a20; }
+.rank-name { flex: 1; min-width: 0; }
+.rank-name b { display: block; font-size: 14.5px; font-weight: 600; }
+.rank-name span { font-size: 12px; color: var(--muted); }
+.rank-score { font-weight: 700; font-size: 16px; color: var(--brand-2); font-variant-numeric: tabular-nums; }
+.rank-score small { font-size: 11px; color: var(--muted); font-weight: 400; }
+
+/* ---------------- แถบคะแนน ---------------- */
+.meter { height: 8px; background: var(--surface-2); border-radius: 20px; overflow: hidden; }
+.meter > i { display: block; height: 100%; border-radius: 20px; }
+
+/* ---------------- กราฟ ---------------- */
+.chart { width: 100%; overflow: visible; display: block; }
+.chart-grid { stroke: var(--line); stroke-width: 1; }
+.chart-axis { stroke: var(--line-2); stroke-width: 1; }
+.chart-label { fill: var(--muted); font-size: 11px; font-family: var(--font); }
+.chart-value { fill: var(--ink-2); font-size: 11px; font-weight: 600; font-family: var(--font);
+               font-variant-numeric: tabular-nums; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--ink-2); }
+.legend-swatch { width: 11px; height: 11px; border-radius: 3px; flex: 0 0 11px; }
+.tip {
+  position: fixed; z-index: 200; pointer-events: none; opacity: 0;
+  background: var(--ink); color: var(--bg); padding: 7px 11px; border-radius: 9px;
+  font-size: 12.5px; line-height: 1.45; box-shadow: var(--shadow-lg);
+  transition: opacity .1s; max-width: 240px;
+}
+.tip b { color: inherit; }
+
+/* ---------------- หน้าเข้าสู่ระบบ ---------------- */
+.login-page {
+  min-height: 100vh; display: grid; place-items: center; padding: 24px;
+  background:
+    radial-gradient(900px 500px at 12% -8%, var(--brand-soft), transparent 62%),
+    radial-gradient(700px 420px at 105% 108%, var(--brand-soft), transparent 58%),
+    var(--bg);
+}
+.login-card {
+  width: 100%; max-width: 400px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: 20px; padding: 30px 26px;
+  box-shadow: var(--shadow-lg);
+}
+.login-logo {
+  width: 58px; height: 58px; border-radius: 17px; margin: 0 auto 14px;
+  background: linear-gradient(140deg, var(--brand-2), var(--brand));
+  color: #fff; display: grid; place-items: center; font-size: 27px;
+}
+
+/* ---------------- แจ้งเตือน ---------------- */
+.alert {
+  padding: 11px 14px; border-radius: var(--radius-sm); font-size: 13.5px;
+  display: flex; gap: 9px; align-items: flex-start; margin-bottom: 14px;
+}
+.alert-error { background: var(--crit-soft); color: #9c2020; }
+.alert-info  { background: var(--brand-soft); color: var(--brand); }
+.alert-warn  { background: var(--warn-soft); color: #8a6100; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .alert-error { color: #f08a8a; }
+  :root:not([data-theme="light"]) .alert-warn  { color: #f5cd6b; }
+}
+
+.toast-wrap {
+  position: fixed; left: 50%; transform: translateX(-50%);
+  bottom: 84px; z-index: 300; display: flex; flex-direction: column;
+  gap: 8px; align-items: center; pointer-events: none; width: calc(100% - 32px); max-width: 460px;
+}
+.toast {
+  background: var(--ink); color: var(--bg); padding: 11px 17px; border-radius: 11px;
+  font-size: 14px; box-shadow: var(--shadow-lg); animation: rise .22s ease-out;
+  display: flex; gap: 9px; align-items: center; width: fit-content; max-width: 100%;
+}
+.toast.ok   { background: var(--good); color: #fff; }
+.toast.err  { background: var(--critical); color: #fff; }
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* ---------------- Modal ---------------- */
+.modal-back {
+  position: fixed; inset: 0; background: rgba(11,11,11,.5); z-index: 400;
+  display: grid; place-items: center; padding: 18px; overflow-y: auto;
+}
+.modal {
+  background: var(--surface); border-radius: 18px; width: 100%; max-width: 560px;
+  box-shadow: var(--shadow-lg); animation: rise .18s ease-out; max-height: 92vh;
+  display: flex; flex-direction: column;
+}
+.modal-head { padding: 18px 20px 12px; border-bottom: 1px solid var(--line); display: flex; align-items: center; }
+.modal-head h3 { font-size: 17px; }
+.modal-body { padding: 18px 20px; overflow-y: auto; }
+.modal-foot { padding: 14px 20px; border-top: 1px solid var(--line); display: flex; gap: 9px; justify-content: flex-end; }
+
+/* ---------------- อื่น ๆ ---------------- */
+.empty { text-align: center; padding: 34px 16px; color: var(--muted); }
+.empty .big { font-size: 36px; margin-bottom: 8px; opacity: .55; }
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--line) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%; animation: sk 1.3s infinite; border-radius: 7px;
+}
+@keyframes sk { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.spinner {
+  width: 17px; height: 17px; border: 2.5px solid rgba(255,255,255,.35);
+  border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.muted { color: var(--muted); }
+.small { font-size: 12.5px; }
+.mono  { font-variant-numeric: tabular-nums; }
+.hide  { display: none !important; }
+.divider { height: 1px; background: var(--line); margin: 16px 0; }
+.chips { display: flex; gap: 7px; flex-wrap: wrap; }
+.chip {
+  padding: 6px 13px; border-radius: 20px; border: 1px solid var(--line-2);
+  background: var(--surface); font-size: 13.5px; cursor: pointer; font-family: inherit;
+  color: var(--ink-2); min-height: 34px;
+}
+.chip.on { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
+
+.kind-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.kind-btn {
+  padding: 15px 12px; border-radius: var(--radius); border: 2px solid var(--line);
+  background: var(--surface); cursor: pointer; font-family: inherit; text-align: center;
+  transition: border-color .12s, background .12s;
+}
+.kind-btn .emo { font-size: 25px; display: block; margin-bottom: 3px; }
+.kind-btn .txt { display: block; font-size: 15px; font-weight: 700; color: var(--ink); }
+.kind-btn .sub { display: block; font-size: 11.5px; color: var(--muted); }
+.kind-btn.on.merit   { border-color: var(--series-1); background: var(--brand-soft); }
+.kind-btn.on.demerit { border-color: var(--series-2); background: #fdeee7; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .kind-btn.on.demerit { background: #2e1c13; }
+}
+
+.pick-list { max-height: 320px; overflow-y: auto; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.pick-item {
+  padding: 11px 13px; border-bottom: 1px solid var(--line); cursor: pointer;
+  display: flex; align-items: center; gap: 11px;
+}
+.pick-item:last-child { border-bottom: none; }
+.pick-item:hover { background: var(--surface-2); }
+.pick-item.on { background: var(--brand-soft); }
+.pick-item .grow { flex: 1; min-width: 0; }
+.pick-item b { font-size: 14.5px; font-weight: 600; display: block; }
+.pick-item span { font-size: 12px; color: var(--muted); }
+.pick-pts { font-weight: 700; font-size: 15px; font-variant-numeric: tabular-nums; }
+
+/* ---------------- มือถือและแท็บเล็ต ---------------- */
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .content { padding: 16px 14px 96px; }
+  .topbar { padding: 12px 14px; }
+  .topbar h1 { font-size: 17px; }
+  .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .grid-3, .grid-2 { grid-template-columns: 1fr; }
+  .span-2 { grid-column: span 1; }
+  .card { padding: 15px; }
+  .table-wrap { margin: 0 -15px; padding: 0 15px; }
+  .stat .value { font-size: 26px; }
+
+  .mobile-bar {
+    display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+    background: var(--surface); border-top: 1px solid var(--line);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  }
+  .mobile-bar button {
+    flex: 1; border: none; background: none; font-family: inherit; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    padding: 6px 2px; color: var(--muted); font-size: 10.5px; border-radius: 10px;
+    position: relative; min-width: 0;
+  }
+  .mobile-bar button .ico { font-size: 20px; line-height: 1; }
+  .mobile-bar button.active { color: var(--brand-2); font-weight: 700; }
+  .mobile-bar .dot {
+    position: absolute; top: 3px; right: 50%; margin-right: -18px;
+    background: var(--critical); color: #fff; font-size: 9.5px; font-weight: 700;
+    min-width: 16px; height: 16px; border-radius: 10px; padding: 0 4px;
+    display: grid; place-items: center;
+  }
+  .modal { max-width: 100%; border-radius: 18px 18px 0 0; margin-top: auto; max-height: 94vh; }
+  .modal-back { padding: 0; align-items: end; }
+  .toast-wrap { bottom: 96px; }
+}
+
+@media (max-width: 420px) {
+  .who { display: none; }
+  .grid-4 { grid-template-columns: 1fr 1fr; }
+  .kind-btn { padding: 12px 8px; }
+}
+
+@media print {
+  .sidebar, .topbar, .mobile-bar, .btn, .toast-wrap { display: none !important; }
+  .content { padding: 0; }
+  .card { border: none; box-shadow: none; padding: 0; }
+}
+</style>
+</head>
+<body>
+  <div id="root">
+    <div class="login-page">
+      <div class="login-card" style="text-align:center">
+        <div class="login-logo">🎓</div>
+        <div class="skeleton" style="height:16px;width:60%;margin:0 auto 10px"></div>
+        <div class="skeleton" style="height:12px;width:40%;margin:0 auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-wrap" id="toasts"></div>
+  <div id="modal-root"></div>
+  <div class="tip" id="tip"></div>
+
+  <script>
+    var PUBLIC_MODE = <?!= publicMode ? 'true' : 'false' ?>;
+  </script>
+
+<!-- ================================================================== -->
+<!-- Script.html -->
+<!-- ================================================================== -->
+<script>
+/* ==================================================================
+   แกนหลักของหน้าเว็บ: สถานะ การเรียก API เราเตอร์ และส่วนประกอบร่วม
+   ================================================================== */
+
+var S = {
+  token: null,
+  user: null,
+  perm: {},
+  app: {},
+  view: 'dashboard',
+  cache: {},
+  pendingCount: 0
+};
+
+var TOKEN_KEY = 'scss_token';
+
+/* ---------------- เรียก API ---------------- */
+
+/**
+ * เรียกฟังก์ชันฝั่งเซิร์ฟเวอร์ คืน Promise
+ * ฟังก์ชันฝั่งเซิร์ฟเวอร์ทุกตัวคืน { ok, data } หรือ { ok:false, error }
+ * เซสชันหมดอายุจะพากลับหน้าเข้าสู่ระบบให้อัตโนมัติ
+ */
+function call(fn, args) {
+  return new Promise(function (resolve, reject) {
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (res && res.ok) return resolve(res.data);
+        var msg = (res && res.error) || 'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ';
+        if (msg.indexOf('เซสชันหมดอายุ') >= 0) {
+          clearToken();
+          renderLogin('เซสชันหมดอายุ กรุณาเข้าสู่ระบบอีกครั้ง');
+        }
+        reject(new Error(msg));
+      })
+      .withFailureHandler(function (err) {
+        reject(new Error(err && err.message ? err.message : 'เชื่อมต่อเซิร์ฟเวอร์ไม่สำเร็จ'));
+      })[fn].apply(null, args || []);
+  });
+}
+
+function saveToken(t) {
+  S.token = t;
+  try { localStorage.setItem(TOKEN_KEY, t); } catch (e) { /* โหมดส่วนตัวของเบราว์เซอร์ */ }
+}
+function loadToken() {
+  try { return localStorage.getItem(TOKEN_KEY); } catch (e) { return null; }
+}
+function clearToken() {
+  S.token = null; S.user = null;
+  try { localStorage.removeItem(TOKEN_KEY); } catch (e) {}
+}
+
+/* ---------------- ตัวช่วยทั่วไป ---------------- */
+
+function esc(v) {
+  return String(v === null || v === undefined ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function $(sel, root) { return (root || document).querySelector(sel); }
+function $$(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
+function el(id) { return document.getElementById(id); }
+function num(v) { return Number(v || 0).toLocaleString('th-TH'); }
+function initials(name) {
+  var s = String(name || '?').replace(/^(นาย|นาง|นางสาว|เด็กชาย|เด็กหญิง|ด\.ช\.|ด\.ญ\.)/, '').trim();
+  return s.charAt(0) || '?';
+}
+
+function toast(message, kind) {
+  var wrap = el('toasts');
+  var t = document.createElement('div');
+  t.className = 'toast ' + (kind || '');
+  t.innerHTML = (kind === 'ok' ? '✓ ' : kind === 'err' ? '⚠ ' : '') + esc(message);
+  wrap.appendChild(t);
+  setTimeout(function () {
+    t.style.transition = 'opacity .25s'; t.style.opacity = '0';
+    setTimeout(function () { t.remove(); }, 260);
+  }, kind === 'err' ? 5200 : 3000);
+}
+
+function openModal(title, bodyHtml, footHtml) {
+  el('modal-root').innerHTML =
+    '<div class="modal-back" onclick="if(event.target===this)closeModal()">' +
+      '<div class="modal" role="dialog" aria-modal="true">' +
+        '<div class="modal-head"><h3>' + esc(title) + '</h3>' +
+          '<button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="closeModal()">✕</button></div>' +
+        '<div class="modal-body">' + bodyHtml + '</div>' +
+        (footHtml ? '<div class="modal-foot">' + footHtml + '</div>' : '') +
+      '</div></div>';
+}
+function closeModal() { el('modal-root').innerHTML = ''; }
+
+function confirmAction(title, message, onYes, danger) {
+  openModal(title, '<p>' + esc(message) + '</p>',
+    '<button class="btn" onclick="closeModal()">ยกเลิก</button>' +
+    '<button class="btn ' + (danger ? 'btn-danger' : 'btn-primary') + '" id="cf-yes">ยืนยัน</button>');
+  el('cf-yes').onclick = function () { closeModal(); onYes(); };
+}
+
+function busy(button, isBusy, labelWhenDone) {
+  if (!button) return;
+  if (isBusy) {
+    button.dataset.label = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner"></span> กำลังทำงาน...';
+  } else {
+    button.disabled = false;
+    button.innerHTML = labelWhenDone || button.dataset.label || 'ตกลง';
+  }
+}
+
+function riskBadge(level) {
+  var map = { 'ปกติ': 'badge-good', 'เฝ้าระวัง': 'badge-warn', 'เสี่ยง': 'badge-serious', 'วิกฤต': 'badge-crit' };
+  var icon = { 'ปกติ': '●', 'เฝ้าระวัง': '▲', 'เสี่ยง': '▲', 'วิกฤต': '■' };
+  return '<span class="badge ' + (map[level] || '') + '">' + (icon[level] || '') + ' ' + esc(level) + '</span>';
+}
+
+function scoreColor(score) {
+  if (score >= 91) return 'var(--good)';
+  if (score >= 71) return 'var(--warning)';
+  if (score >= 51) return 'var(--serious)';
+  return 'var(--critical)';
+}
+
+function statusBadge(status) {
+  var map = {
+    'รออนุมัติ': 'badge-warn', 'อนุมัติแล้ว': 'badge-good',
+    'ไม่อนุมัติ': 'badge-crit', 'เพิกถอน': 'badge'
+  };
+  return '<span class="badge ' + (map[status] || '') + '">' + esc(status) + '</span>';
+}
+
+/* ---------------- เมนู ---------------- */
+
+var MENU = [
+  { id: 'dashboard', icon: '📊', label: 'แดชบอร์ด',      perm: null },
+  { id: 'record',    icon: '✏️', label: 'บันทึกพฤติกรรม', perm: 'record.create' },
+  { id: 'approve',   icon: '✅', label: 'รออนุมัติ',      perm: 'record.approve', badge: true },
+  { id: 'students',  icon: '👥', label: 'นักเรียน',       perm: 'student.view' },
+  { id: 'board',     icon: '🏅', label: 'กระดานเกียรติยศ', perm: null },
+  { id: 'reports',   icon: '📄', label: 'รายงาน',         perm: 'report.view' },
+  { id: 'admin',     icon: '⚙️', label: 'ตั้งค่าระบบ',     perm: 'settings.manage' }
+];
+
+function visibleMenu() {
+  return MENU.filter(function (m) { return !m.perm || S.perm[m.perm]; });
+}
+
+/* เมนูล่างบนมือถือแสดงได้ 5 ช่อง ที่เหลือรวมใน "เพิ่มเติม" */
+function mobileMenu() {
+  var items = visibleMenu();
+  if (items.length <= 5) return items;
+  return items.slice(0, 4).concat([{ id: '__more', icon: '⋯', label: 'เพิ่มเติม' }]);
+}
+
+/* ---------------- โครงหน้า ---------------- */
+
+function renderShell() {
+  var menu = visibleMenu();
+  var mob = mobileMenu();
+
+  el('root').innerHTML =
+    '<div class="app">' +
+      '<nav class="sidebar">' +
+        '<div class="brand">' +
+          '<div class="brand-mark">🎓</div>' +
+          '<div class="brand-text"><b>คะแนนความประพฤติ</b><span>' + esc(S.app.school || '') + '</span></div>' +
+        '</div>' +
+        menu.map(function (m) {
+          return '<button class="navlink" data-nav="' + m.id + '" onclick="go(\'' + m.id + '\')">' +
+            '<span class="ico">' + m.icon + '</span>' + esc(m.label) +
+            (m.badge ? '<span class="pill hide" data-pending></span>' : '') + '</button>';
+        }).join('') +
+        '<div class="nav-sep"></div>' +
+        '<button class="navlink" onclick="openChangePassword()"><span class="ico">🔑</span>เปลี่ยนรหัสผ่าน</button>' +
+        '<button class="navlink" onclick="doLogout()"><span class="ico">🚪</span>ออกจากระบบ</button>' +
+        '<div class="nav-foot">ปีการศึกษา ' + esc(S.app.year) + ' ภาคเรียนที่ ' + esc(S.app.term) +
+          '<br>เวอร์ชัน ' + esc(S.app.version) + '</div>' +
+      '</nav>' +
+
+      '<div class="main">' +
+        '<header class="topbar">' +
+          '<div><h1 id="page-title">แดชบอร์ด</h1>' +
+            '<div class="sub" id="page-sub">ปีการศึกษา ' + esc(S.app.year) +
+            ' ภาคเรียนที่ ' + esc(S.app.term) + '</div></div>' +
+          '<div class="topbar-right">' +
+            '<div class="who"><b>' + esc(S.user.name) + '</b><span>' + esc(S.user.roleName) + '</span></div>' +
+            '<div class="avatar">' + esc(initials(S.user.name)) + '</div>' +
+          '</div>' +
+        '</header>' +
+        '<main class="content" id="content"></main>' +
+      '</div>' +
+    '</div>' +
+
+    '<nav class="mobile-bar">' +
+      mob.map(function (m) {
+        return '<button data-nav="' + m.id + '" onclick="' +
+          (m.id === '__more' ? 'openMoreMenu()' : 'go(\'' + m.id + '\')') + '">' +
+          '<span class="ico">' + m.icon + '</span>' + esc(m.label) +
+          (m.badge ? '<span class="dot hide" data-pending></span>' : '') + '</button>';
+      }).join('') +
+    '</nav>';
+}
+
+function openMoreMenu() {
+  var shown = mobileMenu().map(function (m) { return m.id; });
+  var rest = visibleMenu().filter(function (m) { return shown.indexOf(m.id) < 0; });
+  openModal('เมนูเพิ่มเติม',
+    '<div class="pick-list">' +
+      rest.map(function (m) {
+        return '<div class="pick-item" onclick="closeModal();go(\'' + m.id + '\')">' +
+          '<span style="font-size:19px">' + m.icon + '</span><div class="grow"><b>' + esc(m.label) + '</b></div></div>';
+      }).join('') +
+      '<div class="pick-item" onclick="closeModal();openChangePassword()">' +
+        '<span style="font-size:19px">🔑</span><div class="grow"><b>เปลี่ยนรหัสผ่าน</b></div></div>' +
+      '<div class="pick-item" onclick="closeModal();doLogout()">' +
+        '<span style="font-size:19px">🚪</span><div class="grow"><b>ออกจากระบบ</b></div></div>' +
+    '</div>');
+}
+
+function setActiveNav(view) {
+  $$('[data-nav]').forEach(function (n) {
+    n.classList.toggle('active', n.getAttribute('data-nav') === view);
+  });
+}
+
+function updatePendingBadge(count) {
+  S.pendingCount = count;
+  $$('[data-pending]').forEach(function (b) {
+    b.textContent = count > 99 ? '99+' : count;
+    b.classList.toggle('hide', !count);
+  });
+}
+
+var VIEWS = {};   // ลงทะเบียนไว้ใน ScriptViews.html
+
+function go(view) {
+  if (!VIEWS[view]) view = 'dashboard';
+  S.view = view;
+  setActiveNav(view);
+  var meta = MENU.filter(function (m) { return m.id === view; })[0];
+  if (meta) el('page-title').textContent = meta.label;
+  var content = el('content');
+  content.innerHTML = '<div class="grid grid-2">' +
+    '<div class="card"><div class="skeleton" style="height:100px"></div></div>' +
+    '<div class="card"><div class="skeleton" style="height:100px"></div></div></div>';
+  window.scrollTo(0, 0);
+
+  Promise.resolve(VIEWS[view](content)).catch(function (e) {
+    content.innerHTML = '<div class="card"><div class="alert alert-error">⚠ ' + esc(e.message) + '</div>' +
+      '<button class="btn" onclick="go(\'' + view + '\')">ลองใหม่</button></div>';
+  });
+}
+
+/* ---------------- เข้าสู่ระบบ ---------------- */
+
+function renderLogin(message) {
+  el('root').innerHTML =
+    '<div class="login-page"><div class="login-card">' +
+      '<div class="login-logo">🎓</div>' +
+      '<h2 style="text-align:center;font-size:19px">ระบบคะแนนความประพฤตินักเรียน</h2>' +
+      '<p style="text-align:center;color:var(--muted);font-size:13.5px;margin-bottom:20px">โรงเรียนจุนวิทยาคม</p>' +
+      (message ? '<div class="alert alert-warn">⚠ ' + esc(message) + '</div>' : '') +
+      '<div id="login-error"></div>' +
+      '<form id="login-form" autocomplete="on">' +
+        '<div class="field"><label for="lg-user">ชื่อผู้ใช้</label>' +
+          '<input id="lg-user" type="text" autocomplete="username" autocapitalize="none" ' +
+          'spellcheck="false" required placeholder="เช่น kru.somchai"></div>' +
+        '<div class="field"><label for="lg-pass">รหัสผ่าน</label>' +
+          '<input id="lg-pass" type="password" autocomplete="current-password" required></div>' +
+        '<button class="btn btn-primary btn-block" type="submit" id="lg-btn" style="margin-top:6px">เข้าสู่ระบบ</button>' +
+      '</form>' +
+      '<div class="divider"></div>' +
+      '<button class="btn btn-ghost btn-block btn-sm" onclick="renderPublicBoard()">' +
+        '🏅 ดูกระดานเกียรติยศ (ไม่ต้องเข้าสู่ระบบ)</button>' +
+    '</div></div>';
+
+  el('login-form').onsubmit = function (ev) {
+    ev.preventDefault();
+    var btn = el('lg-btn');
+    el('login-error').innerHTML = '';
+    busy(btn, true);
+    call('apiLogin', [el('lg-user').value, el('lg-pass').value])
+      .then(function (res) {
+        saveToken(res.token);
+        S.user = res.user; S.perm = res.permissions; S.app = res.app;
+        renderShell();
+        go('dashboard');
+        if (res.user.mustChangePassword) {
+          setTimeout(function () { openChangePassword(true); }, 400);
+        }
+      })
+      .catch(function (e) {
+        busy(btn, false, 'เข้าสู่ระบบ');
+        el('login-error').innerHTML = '<div class="alert alert-error">⚠ ' + esc(e.message) + '</div>';
+      });
+  };
+  setTimeout(function () { var u = el('lg-user'); if (u) u.focus(); }, 60);
+}
+
+function doLogout() {
+  confirmAction('ออกจากระบบ', 'ต้องการออกจากระบบใช่หรือไม่', function () {
+    var t = S.token;
+    clearToken();
+    renderLogin();
+    call('apiLogout', [t]).catch(function () {});
+  });
+}
+
+function openChangePassword(forced) {
+  openModal('เปลี่ยนรหัสผ่าน',
+    (forced ? '<div class="alert alert-warn">⚠ นี่เป็นการเข้าใช้ครั้งแรก กรุณาตั้งรหัสผ่านใหม่ก่อนใช้งาน</div>' : '') +
+    '<div id="cp-error"></div>' +
+    '<div class="field"><label>รหัสผ่านเดิม</label><input id="cp-old" type="password" autocomplete="current-password"></div>' +
+    '<div class="field"><label>รหัสผ่านใหม่</label><input id="cp-new" type="password" autocomplete="new-password">' +
+      '<div class="help">อย่างน้อย 8 ตัวอักษร ควรผสมตัวอักษรและตัวเลข</div></div>' +
+    '<div class="field"><label>ยืนยันรหัสผ่านใหม่</label><input id="cp-new2" type="password" autocomplete="new-password"></div>',
+    '<button class="btn" onclick="closeModal()">ปิด</button>' +
+    '<button class="btn btn-primary" id="cp-save">บันทึก</button>');
+
+  el('cp-save').onclick = function () {
+    var a = el('cp-new').value, b = el('cp-new2').value;
+    if (a !== b) {
+      el('cp-error').innerHTML = '<div class="alert alert-error">⚠ รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน</div>';
+      return;
+    }
+    var btn = this;
+    busy(btn, true);
+    call('apiChangePassword', [S.token, el('cp-old').value, a])
+      .then(function () { closeModal(); toast('เปลี่ยนรหัสผ่านเรียบร้อย', 'ok'); })
+      .catch(function (e) {
+        busy(btn, false, 'บันทึก');
+        el('cp-error').innerHTML = '<div class="alert alert-error">⚠ ' + esc(e.message) + '</div>';
+      });
+  };
+}
+
+/* ---------------- เริ่มทำงาน ---------------- */
+
+function boot() {
+  if (PUBLIC_MODE) { renderPublicBoard(); return; }
+
+  var t = loadToken();
+  if (!t) { renderLogin(); return; }
+
+  S.token = t;
+  call('apiMe', [t])
+    .then(function (res) {
+      S.user = res.user; S.perm = res.permissions; S.app = res.app;
+      renderShell();
+      go('dashboard');
+    })
+    .catch(function () { clearToken(); renderLogin(); });
+}
+</script>
+
+<!-- ================================================================== -->
+<!-- ScriptCharts.html -->
+<!-- ================================================================== -->
+<script>
+/* ==================================================================
+   กราฟทั้งหมดวาดด้วย SVG ที่เขียนเอง ไม่ต้องโหลดไลบรารีภายนอก
+   โรงเรียนที่อินเทอร์เน็ตช้าจึงเปิดใช้ได้ และไม่มีข้อมูลรั่วออกนอกระบบ
+
+   หลักที่ยึด: เส้นบาง เส้นกริดจาง ป้ายกำกับเฉพาะจุดที่จำเป็น
+   มีคำอธิบายสัญลักษณ์เมื่อมีตั้งแต่ 2 ชุดข้อมูลขึ้นไป และดูเป็นตารางได้
+   ================================================================== */
+
+var CHART_REGISTRY = [];
+
+function registerChart(fn) {
+  CHART_REGISTRY.push(fn);
+  fn();
+}
+function clearCharts() { CHART_REGISTRY = []; }
+
+var _resizeTimer;
+window.addEventListener('resize', function () {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(function () {
+    CHART_REGISTRY.forEach(function (fn) { try { fn(); } catch (e) {} });
+  }, 180);
+});
+
+function showTip(html, x, y) {
+  var tip = el('tip');
+  tip.innerHTML = html;
+  tip.style.opacity = '1';
+  var w = tip.offsetWidth, h = tip.offsetHeight;
+  var left = Math.min(Math.max(8, x - w / 2), window.innerWidth - w - 8);
+  var top = y - h - 12;
+  if (top < 8) top = y + 18;
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+}
+function hideTip() { el('tip').style.opacity = '0'; }
+
+/* ------------------------------------------------------------------ */
+/* กราฟเส้น: เปรียบเทียบความดีกับความผิดรายเดือน                          */
+/* ------------------------------------------------------------------ */
+
+function lineChart(containerId, points, series) {
+  var box = el(containerId);
+  if (!box) return;
+  var W = Math.max(box.clientWidth || 320, 280);
+  var H = 230;
+  var pad = { t: 18, r: 46, b: 30, l: 34 };
+  var iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
+
+  var maxVal = 1;
+  series.forEach(function (s) {
+    points.forEach(function (p) { maxVal = Math.max(maxVal, Number(p[s.key]) || 0); });
+  });
+  maxVal = Math.ceil(maxVal * 1.15 / 5) * 5 || 5;
+
+  function px(i) { return pad.l + (points.length === 1 ? iw / 2 : i * iw / (points.length - 1)); }
+  function py(v) { return pad.t + ih - (Number(v) || 0) / maxVal * ih; }
+
+  var svg = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H +
+            '" role="img" aria-label="แนวโน้มรายเดือน">';
+
+  // เส้นกริดแนวนอน 4 ระดับ — จางกว่าข้อมูลเสมอ
+  for (var g = 0; g <= 4; g++) {
+    var v = maxVal * g / 4, y = py(v);
+    svg += '<line class="chart-grid" x1="' + pad.l + '" y1="' + y + '" x2="' + (W - pad.r) + '" y2="' + y + '"/>';
+    svg += '<text class="chart-label" x="' + (pad.l - 7) + '" y="' + (y + 3.5) +
+           '" text-anchor="end">' + Math.round(v) + '</text>';
+  }
+  svg += '<line class="chart-axis" x1="' + pad.l + '" y1="' + (pad.t + ih) + '" x2="' + (W - pad.r) +
+         '" y2="' + (pad.t + ih) + '"/>';
+
+  points.forEach(function (p, i) {
+    svg += '<text class="chart-label" x="' + px(i) + '" y="' + (H - 9) + '" text-anchor="middle">' +
+           esc(p.label) + '</text>';
+  });
+
+  series.forEach(function (s) {
+    var d = points.map(function (p, i) { return (i ? 'L' : 'M') + px(i) + ' ' + py(p[s.key]); }).join(' ');
+    svg += '<path d="' + d + '" fill="none" stroke="' + s.color +
+           '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+    points.forEach(function (p, i) {
+      // วงแหวนสีพื้นหลัง 2px กันจุดสองชุดทับกันจนแยกไม่ออก
+      svg += '<circle cx="' + px(i) + '" cy="' + py(p[s.key]) + '" r="4" fill="' + s.color +
+             '" stroke="var(--surface)" stroke-width="2"/>';
+    });
+    // ป้ายกำกับที่จุดสุดท้ายเท่านั้น ไม่ใส่ตัวเลขทุกจุด
+    var last = points.length - 1;
+    svg += '<text class="chart-value" x="' + (px(last) + 9) + '" y="' + (py(points[last][s.key]) + 4) +
+           '" fill="' + s.color + '">' + esc(s.label) + '</text>';
+  });
+
+  // พื้นที่รับเมาส์รายเดือน ใหญ่กว่าจุดข้อมูลเพื่อให้แตะง่ายบนมือถือ
+  points.forEach(function (p, i) {
+    var half = points.length > 1 ? iw / (points.length - 1) / 2 : iw / 2;
+    svg += '<rect x="' + (px(i) - half) + '" y="' + pad.t + '" width="' + (half * 2) + '" height="' + ih +
+           '" fill="transparent" data-hover="' + i + '" style="cursor:pointer"/>';
+  });
+  svg += '<line id="' + containerId + '-cross" class="chart-axis" y1="' + pad.t + '" y2="' + (pad.t + ih) +
+         '" x1="-10" x2="-10" stroke-dasharray="3 3" opacity="0"/></svg>';
+
+  box.innerHTML =
+    '<div class="legend">' + series.map(function (s) {
+      return '<span class="legend-item"><span class="legend-swatch" style="background:' + s.color + '"></span>' +
+             esc(s.label) + '</span>';
+    }).join('') + '</div>' + svg;
+
+  var cross = el(containerId + '-cross');
+  $$('[data-hover]', box).forEach(function (r) {
+    var i = Number(r.getAttribute('data-hover'));
+    function show(ev) {
+      var rect = r.getBoundingClientRect();
+      cross.setAttribute('x1', px(i)); cross.setAttribute('x2', px(i));
+      cross.setAttribute('opacity', '.5');
+      showTip('<b>' + esc(points[i].label) + '</b><br>' + series.map(function (s) {
+        return '<span style="color:' + s.color + '">●</span> ' + esc(s.label) + ' ' + (points[i][s.key] || 0) + ' ครั้ง';
+      }).join('<br>'), rect.left + rect.width / 2, rect.top + 30);
+    }
+    r.addEventListener('mouseenter', show);
+    r.addEventListener('mousemove', show);
+    r.addEventListener('touchstart', show, { passive: true });
+    r.addEventListener('mouseleave', function () { cross.setAttribute('opacity', '0'); hideTip(); });
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* กราฟแท่งแนวนอน: ใช้กับพฤติกรรมที่พบบ่อย (ชุดข้อมูลเดียว จึงไม่ต้องมีคำอธิบายสี) */
+/* ------------------------------------------------------------------ */
+
+function barChartH(containerId, items, opts) {
+  var box = el(containerId);
+  if (!box) return;
+  opts = opts || {};
+  if (!items.length) {
+    box.innerHTML = '<div class="empty"><div class="big">📭</div>ยังไม่มีข้อมูลในช่วงนี้</div>';
+    return;
+  }
+  var color = opts.color || 'var(--series-1)';
+  var max = Math.max.apply(null, items.map(function (i) { return i.count; })) || 1;
+
+  box.innerHTML = items.map(function (i) {
+    var pct = Math.round(i.count / max * 100);
+    return '<div style="margin-bottom:11px" title="' + esc(i.name) + ' ' + i.count + ' ครั้ง">' +
+      '<div style="display:flex;gap:10px;align-items:baseline;margin-bottom:4px">' +
+        '<span style="font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+          esc(i.name) + '</span>' +
+        '<b class="mono" style="font-size:14px">' + i.count + '</b>' +
+        '<span class="small muted">ครั้ง</span>' +
+      '</div>' +
+      '<div class="meter"><i style="width:' + pct + '%;background:' + color + '"></i></div>' +
+    '</div>';
+  }).join('');
+}
+
+/* ------------------------------------------------------------------ */
+/* กราฟแท่งแนวตั้ง: คะแนนเฉลี่ยรายระดับชั้น                                */
+/* ------------------------------------------------------------------ */
+
+function barChartV(containerId, items, opts) {
+  var box = el(containerId);
+  if (!box) return;
+  opts = opts || {};
+  if (!items.length) { box.innerHTML = '<div class="empty">ยังไม่มีข้อมูล</div>'; return; }
+
+  var W = Math.max(box.clientWidth || 320, 260);
+  var H = 210;
+  var pad = { t: 22, r: 8, b: 40, l: 34 };
+  var iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
+  var min = opts.min !== undefined ? opts.min : 0;
+  var max = opts.max !== undefined ? opts.max : Math.max.apply(null, items.map(function (i) { return i.value; }));
+  if (max === min) max = min + 1;
+
+  var slot = iw / items.length;
+  var barW = Math.min(slot - 12, 62);
+
+  var svg = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H +
+            '" role="img" aria-label="' + esc(opts.aria || 'กราฟแท่ง') + '">';
+
+  for (var g = 0; g <= 3; g++) {
+    var v = min + (max - min) * g / 3;
+    var y = pad.t + ih - (v - min) / (max - min) * ih;
+    svg += '<line class="chart-grid" x1="' + pad.l + '" y1="' + y + '" x2="' + (W - pad.r) + '" y2="' + y + '"/>' +
+           '<text class="chart-label" x="' + (pad.l - 7) + '" y="' + (y + 3.5) + '" text-anchor="end">' +
+           Math.round(v) + '</text>';
+  }
+
+  items.forEach(function (it, i) {
+    var h = Math.max(3, (it.value - min) / (max - min) * ih);
+    var x = pad.l + slot * i + (slot - barW) / 2;
+    var y = pad.t + ih - h;
+    svg += '<rect x="' + x + '" y="' + y + '" width="' + barW + '" height="' + h +
+           '" rx="4" fill="' + (opts.color || 'var(--series-1)') + '" data-bar="' + i + '" style="cursor:pointer"/>' +
+           '<text class="chart-value" x="' + (x + barW / 2) + '" y="' + (y - 6) + '" text-anchor="middle">' +
+           it.value + '</text>' +
+           '<text class="chart-label" x="' + (x + barW / 2) + '" y="' + (H - 22) + '" text-anchor="middle">' +
+           esc(it.label) + '</text>' +
+           (it.n !== undefined ? '<text class="chart-label" x="' + (x + barW / 2) + '" y="' + (H - 8) +
+             '" text-anchor="middle" opacity=".75">' + it.n + ' คน</text>' : '');
+  });
+  svg += '</svg>';
+  box.innerHTML = svg;
+
+  $$('[data-bar]', box).forEach(function (r) {
+    var it = items[Number(r.getAttribute('data-bar'))];
+    r.addEventListener('mouseenter', function () {
+      var b = r.getBoundingClientRect();
+      showTip('<b>' + esc(it.label) + '</b><br>' + esc(opts.valueLabel || 'ค่า') + ' ' + it.value +
+        (it.n !== undefined ? '<br>นักเรียน ' + it.n + ' คน' : ''), b.left + b.width / 2, b.top);
+    });
+    r.addEventListener('mouseleave', hideTip);
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* แถบสัดส่วน: การกระจายตามระดับความเสี่ยง                                */
+/* ใช้สีสถานะประจำระบบ และมีทั้งไอคอนและตัวอักษรกำกับเสมอ ไม่พึ่งสีอย่างเดียว */
+/* ------------------------------------------------------------------ */
+
+function segmentBar(containerId, segments) {
+  var box = el(containerId);
+  if (!box) return;
+  var total = segments.reduce(function (a, s) { return a + s.value; }, 0);
+  if (!total) { box.innerHTML = '<div class="empty">ยังไม่มีข้อมูล</div>'; return; }
+
+  box.innerHTML =
+    '<div style="display:flex;height:15px;border-radius:20px;overflow:hidden;gap:2px;margin-bottom:14px">' +
+      segments.filter(function (s) { return s.value > 0; }).map(function (s) {
+        return '<div style="width:' + (s.value / total * 100) + '%;background:' + s.color + '" ' +
+               'title="' + esc(s.label) + ' ' + s.value + ' คน"></div>';
+      }).join('') +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px">' +
+      segments.map(function (s) {
+        return '<div style="display:flex;align-items:center;gap:8px">' +
+          '<span style="width:10px;height:10px;border-radius:3px;background:' + s.color + ';flex:0 0 10px"></span>' +
+          '<span style="font-size:13px;flex:1">' + esc(s.icon || '') + ' ' + esc(s.label) + '</span>' +
+          '<b class="mono" style="font-size:14px">' + s.value + '</b>' +
+          '<span class="small muted">' + Math.round(s.value / total * 100) + '%</span>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+}
+
+/* ------------------------------------------------------------------ */
+/* กราฟเส้นเล็กสำหรับหน้าประวัตินักเรียน                                    */
+/* ------------------------------------------------------------------ */
+
+function sparkScore(containerId, timeline, startScore) {
+  var box = el(containerId);
+  if (!box) return;
+  var pts = [{ date: 'เริ่มต้น', score: startScore }].concat(timeline);
+  if (pts.length < 2) {
+    box.innerHTML = '<div class="empty small">ยังไม่มีการเปลี่ยนแปลงคะแนนในปีการศึกษานี้</div>';
+    return;
+  }
+
+  var W = Math.max(box.clientWidth || 320, 260), H = 130;
+  var pad = { t: 14, r: 12, b: 20, l: 30 };
+  var iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
+  // ช่วงแกนตั้งปรับตามคะแนนจริง ถ้าคะแนนยังสูงอยู่จะซูมให้เห็นการเปลี่ยนแปลงเล็กน้อยได้
+  var lowest = Math.min.apply(null, pts.map(function (p) { return p.score; }));
+  var max = 100, min = Math.max(0, Math.floor((lowest - 10) / 10) * 10);
+  if (max - min < 20) min = Math.max(0, max - 20);
+
+  function px(i) { return pad.l + i * iw / (pts.length - 1); }
+  function py(v) { return pad.t + ih - (v - min) / (max - min) * ih; }
+
+  var d = pts.map(function (p, i) { return (i ? 'L' : 'M') + px(i) + ' ' + py(p.score); }).join(' ');
+  var area = d + ' L' + px(pts.length - 1) + ' ' + (pad.t + ih) + ' L' + px(0) + ' ' + (pad.t + ih) + ' Z';
+
+  var svg = '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '">';
+  [min, Math.round((min + max) / 2), max].forEach(function (v) {
+    svg += '<line class="chart-grid" x1="' + pad.l + '" y1="' + py(v) + '" x2="' + (W - pad.r) + '" y2="' + py(v) + '"/>' +
+           '<text class="chart-label" x="' + (pad.l - 6) + '" y="' + (py(v) + 3.5) + '" text-anchor="end">' + v + '</text>';
+  });
+  svg += '<path d="' + area + '" fill="var(--brand-2)" opacity=".1"/>' +
+         '<path d="' + d + '" fill="none" stroke="var(--brand-2)" stroke-width="2" stroke-linejoin="round"/>';
+  pts.forEach(function (p, i) {
+    svg += '<circle cx="' + px(i) + '" cy="' + py(p.score) + '" r="3.5" fill="var(--brand-2)" ' +
+           'stroke="var(--surface)" stroke-width="2" data-sp="' + i + '" style="cursor:pointer"/>';
+  });
+  var lastPt = pts[pts.length - 1];
+  svg += '<text class="chart-value" x="' + (px(pts.length - 1)) + '" y="' + (py(lastPt.score) - 9) +
+         '" text-anchor="end">' + lastPt.score + '</text></svg>';
+  box.innerHTML = svg;
+
+  $$('[data-sp]', box).forEach(function (c) {
+    var p = pts[Number(c.getAttribute('data-sp'))];
+    c.addEventListener('mouseenter', function () {
+      var b = c.getBoundingClientRect();
+      showTip('<b>' + esc(p.date) + '</b><br>คะแนนคงเหลือ ' + p.score, b.left + b.width / 2, b.top);
+    });
+    c.addEventListener('mouseleave', hideTip);
+  });
+}
+</script>
+
+<!-- ================================================================== -->
+<!-- ScriptViews.html -->
+<!-- ================================================================== -->
+<script>
+/* ==================================================================
+   หน้าจอทั้งหมดของระบบ
+   ================================================================== */
+
+/* ------------------------------------------------------------------ */
+/* 1. แดชบอร์ด                                                         */
+/* ------------------------------------------------------------------ */
+
+VIEWS.dashboard = function (root) {
+  return call('apiDashboard', [S.token]).then(function (d) {
+    clearCharts();
+    updatePendingBadge(d.stats.pending);
+
+    var st = d.stats;
+    var ratioNote = st.meritRatio === null
+      ? 'ยังไม่มีการหักคะแนนเดือนนี้'
+      : (st.meritRatio >= 3 ? 'อยู่ในเกณฑ์ดี (เป้าหมาย 3:1)' : 'ต่ำกว่าเป้าหมาย 3:1 ควรส่งเสริมการบันทึกความดี');
+
+    root.innerHTML =
+      '<div class="grid grid-4" style="margin-bottom:16px">' +
+        statCard('👥', 'นักเรียนทั้งหมด', num(st.students), 'คน', 'ที่มีสถานะกำลังศึกษา') +
+        statCard('📈', 'คะแนนเฉลี่ยทั้งโรงเรียน', st.avgScore, 'คะแนน', 'จากเต็ม 100 คะแนน') +
+        statCard('🌟', 'ความดีเดือนนี้', num(st.monthMerit), 'ครั้ง',
+          st.monthDemerit + ' ครั้งที่ทำผิด · ' + ratioNote) +
+        statCard('🔔', 'นักเรียนต้องช่วยเหลือ', num(st.atRisk), 'คน',
+          'เฝ้าระวังอีก ' + st.watch + ' คน', st.atRisk > 0 ? 'var(--critical)' : null) +
+      '</div>' +
+
+      (st.pending && d.canApprove
+        ? '<div class="card" style="margin-bottom:16px;border-color:var(--warning);background:var(--warn-soft)">' +
+            '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+              '<span style="font-size:22px">⏳</span>' +
+              '<div style="flex:1;min-width:180px"><b>มีบันทึกรอการพิจารณา ' + st.pending + ' รายการ</b>' +
+              '<div class="small muted">บันทึกที่ยังไม่อนุมัติจะยังไม่มีผลต่อคะแนนของนักเรียน</div></div>' +
+              '<button class="btn btn-primary" onclick="go(\'approve\')">ไปพิจารณา</button>' +
+            '</div></div>'
+        : '') +
+
+      '<div class="grid grid-2" style="margin-bottom:16px">' +
+        '<div class="card">' +
+          '<div class="card-head"><h3>แนวโน้ม 6 เดือนล่าสุด</h3>' +
+            '<div class="right"><button class="btn btn-ghost btn-sm" onclick="toggleTrendTable()" ' +
+              'id="trend-toggle">ดูเป็นตาราง</button></div></div>' +
+          '<div id="chart-trend"></div>' +
+          '<div id="trend-table" class="hide" style="margin-top:10px"></div>' +
+          '<p class="small muted" style="margin:10px 0 0">ระบบที่ดีควรมีอัตราส่วนความดีต่อความผิดอย่างน้อย 3 ต่อ 1 ' +
+            'ถ้าต่ำกว่านี้แปลว่าระบบกำลังกลายเป็นเครื่องมือจับผิด</p>' +
+        '</div>' +
+        '<div class="card">' +
+          '<div class="card-head"><h3>การกระจายตามระดับความเสี่ยง</h3></div>' +
+          '<div id="chart-risk"></div>' +
+          '<div class="divider"></div>' +
+          '<div class="card-head"><h3>คะแนนเฉลี่ยรายระดับชั้น</h3></div>' +
+          '<div id="chart-grade"></div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div class="grid grid-2">' +
+        '<div class="card">' +
+          '<div class="card-head"><h3>พฤติกรรมที่พบบ่อย</h3>' +
+            '<span class="hint">5 อันดับแรกของปีการศึกษานี้</span></div>' +
+          '<div id="chart-violations"></div>' +
+          (d.topViolations.length
+            ? '<p class="small muted" style="margin:12px 0 0">ข้อมูลนี้ใช้วางแผนป้องกันเชิงระบบ ' +
+              'เช่น จัดครูเวรตามจุดและช่วงเวลาที่พบบ่อย ได้ผลกว่าการตามหักคะแนนทีละคน</p>' : '') +
+        '</div>' +
+        '<div class="card">' +
+          '<div class="card-head"><h3>🏅 กระดานเกียรติยศ</h3>' +
+            '<div class="right"><button class="btn btn-ghost btn-sm" onclick="go(\'board\')">ดูทั้งหมด</button></div></div>' +
+          '<div style="font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:4px">มัธยมศึกษาตอนต้น</div>' +
+          rankList(d.leaderboard.lower) +
+          '<div style="font-size:12.5px;font-weight:700;color:var(--muted);margin:14px 0 4px">มัธยมศึกษาตอนปลาย</div>' +
+          rankList(d.leaderboard.upper) +
+        '</div>' +
+      '</div>';
+
+    window._trendData = d.months;
+    registerChart(function () {
+      lineChart('chart-trend', d.months, [
+        { key: 'merit',   label: 'ความดี',  color: 'var(--series-1)' },
+        { key: 'demerit', label: 'ความผิด', color: 'var(--series-2)' }
+      ]);
+    });
+    registerChart(function () {
+      segmentBar('chart-risk', [
+        { label: 'ปกติ',     icon: '●', value: d.risk['ปกติ'] || 0,     color: 'var(--good)' },
+        { label: 'เฝ้าระวัง', icon: '▲', value: d.risk['เฝ้าระวัง'] || 0, color: 'var(--warning)' },
+        { label: 'เสี่ยง',    icon: '▲', value: d.risk['เสี่ยง'] || 0,    color: 'var(--serious)' },
+        { label: 'วิกฤต',    icon: '■', value: d.risk['วิกฤต'] || 0,    color: 'var(--critical)' }
+      ]);
+    });
+    registerChart(function () {
+      barChartV('chart-grade', d.gradeAvg, { min: 60, max: 100, valueLabel: 'คะแนนเฉลี่ย',
+        aria: 'คะแนนเฉลี่ยรายระดับชั้น' });
+    });
+    registerChart(function () { barChartH('chart-violations', d.topViolations); });
+  });
+};
+
+function statCard(icon, label, value, unit, foot, color) {
+  return '<div class="card"><div class="stat">' +
+    '<div class="label"><span class="stat-icon">' + icon + '</span>' + esc(label) + '</div>' +
+    '<div class="value"' + (color ? ' style="color:' + color + '"' : '') + '>' + esc(value) +
+      ' <span class="unit">' + esc(unit) + '</span></div>' +
+    '<div class="foot">' + esc(foot) + '</div>' +
+  '</div></div>';
+}
+
+function rankList(items) {
+  if (!items.length) {
+    return '<div class="empty small" style="padding:16px">ยังไม่มีนักเรียนที่เข้าเกณฑ์ในระดับนี้</div>';
+  }
+  return items.map(function (c) {
+    return '<div class="rank-item">' +
+      '<div class="rank-no rank-' + c.rank + '">' + c.rank + '</div>' +
+      '<div class="rank-name"><b>' + esc(c.displayName) + '</b><span>' + esc(c.classLabel) + '</span></div>' +
+      '<div class="rank-score">' + c.meritTotal + ' <small>คะแนน</small></div>' +
+    '</div>';
+  }).join('');
+}
+
+function toggleTrendTable() {
+  var t = el('trend-table'), c = el('chart-trend'), btn = el('trend-toggle');
+  var showTable = t.classList.contains('hide');
+  if (showTable && !t.innerHTML) {
+    t.innerHTML = '<div class="table-wrap"><table class="data"><thead><tr>' +
+      '<th>เดือน</th><th class="num">ความดี (ครั้ง)</th><th class="num">ความผิด (ครั้ง)</th>' +
+      '</tr></thead><tbody>' +
+      window._trendData.map(function (m) {
+        return '<tr><td>' + esc(m.label) + '</td><td class="num">' + m.merit +
+               '</td><td class="num">' + m.demerit + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+  t.classList.toggle('hide', !showTable);
+  c.classList.toggle('hide', showTable);
+  btn.textContent = showTable ? 'ดูเป็นกราฟ' : 'ดูเป็นตาราง';
+}
+
+/* ------------------------------------------------------------------ */
+/* 2. บันทึกพฤติกรรม — หน้าจอที่ต้องเร็วที่สุดในระบบ                        */
+/* ------------------------------------------------------------------ */
+
+var REC = { kind: 'ความดี', student: null, rule: null, rules: null };
+
+VIEWS.record = function (root) {
+  root.innerHTML =
+    '<div class="grid grid-2">' +
+      '<div class="card">' +
+        '<div class="card-head"><h3>บันทึกพฤติกรรมนักเรียน</h3></div>' +
+
+        '<div class="kind-switch">' +
+          '<button class="kind-btn merit on" id="k-merit" onclick="setKind(\'ความดี\')">' +
+            '<span class="emo">🌟</span><span class="txt">ความดี</span>' +
+            '<span class="sub">เพิ่มคะแนน</span></button>' +
+          '<button class="kind-btn demerit" id="k-demerit" onclick="setKind(\'ความผิด\')">' +
+            '<span class="emo">⚠️</span><span class="txt">ความผิด</span>' +
+            '<span class="sub">หักคะแนน</span></button>' +
+        '</div>' +
+
+        '<div class="field"><label>1. เลือกนักเรียน</label>' +
+          '<div id="rec-student"></div></div>' +
+
+        '<div class="field"><label>2. เลือกหลักเกณฑ์ <span class="muted" id="rule-count"></span></label>' +
+          '<input type="search" id="rule-search" placeholder="พิมพ์ค้นหาเกณฑ์..." ' +
+            'oninput="renderRules()" style="margin-bottom:8px">' +
+          '<div class="pick-list" id="rule-list"></div></div>' +
+
+        '<div class="field"><label for="rec-detail">3. รายละเอียดเหตุการณ์ <span class="muted">(จำเป็น)</span></label>' +
+          '<textarea id="rec-detail" placeholder="เกิดอะไรขึ้น ที่ไหน อย่างไร เขียนตามจริงอย่างเป็นกลาง"></textarea>' +
+          '<div class="help">รายละเอียดที่ดีช่วยให้เห็นสาเหตุเชิงระบบ เช่น มาสายเพราะรถรับส่ง ไม่ใช่เพราะขาดวินัย</div></div>' +
+
+        '<div class="row">' +
+          '<div class="field"><label for="rec-place">สถานที่</label>' +
+            '<input type="text" id="rec-place" placeholder="เช่น หน้าเสาธง โรงอาหาร"></div>' +
+          '<div class="field"><label for="rec-when">วันเวลาที่เกิดเหตุ</label>' +
+            '<input type="datetime-local" id="rec-when"></div>' +
+        '</div>' +
+
+        '<div class="field hide" id="evidence-field"><label for="rec-evidence">ลิงก์หลักฐาน ' +
+          '<span class="muted">(เกณฑ์นี้บังคับ)</span></label>' +
+          '<input type="text" id="rec-evidence" placeholder="วางลิงก์รูปภาพจาก Google Drive หรือ Google Photos">' +
+          '<div class="help">อัปโหลดไฟล์ขึ้น Google Drive ของโรงเรียนแล้วนำลิงก์มาวาง</div></div>' +
+
+        '<button class="btn btn-primary btn-block" id="rec-submit" onclick="submitRecord(this)" ' +
+          'style="margin-top:6px">บันทึกและส่งให้พิจารณา</button>' +
+        '<p class="small muted" style="margin-top:10px">บันทึกจะมีผลต่อคะแนนเมื่อผู้มีอำนาจอนุมัติแล้วเท่านั้น</p>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<div class="card-head"><h3>บันทึกล่าสุดของฉัน</h3>' +
+          '<div class="right"><button class="btn btn-ghost btn-sm" onclick="loadMyRecords()">รีเฟรช</button></div></div>' +
+        '<div id="my-records"><div class="skeleton" style="height:120px"></div></div>' +
+      '</div>' +
+    '</div>';
+
+  var now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  el('rec-when').value = now.toISOString().slice(0, 16);
+
+  REC.student = null; REC.rule = null;
+  renderStudentPicker();
+  loadMyRecords();
+
+  return call('apiListRules', [S.token]).then(function (rules) {
+    REC.rules = rules;
+    renderRules();
+  });
+};
+
+function setKind(kind) {
+  REC.kind = kind;
+  REC.rule = null;
+  el('k-merit').classList.toggle('on', kind === 'ความดี');
+  el('k-demerit').classList.toggle('on', kind === 'ความผิด');
+  el('evidence-field').classList.add('hide');
+  renderRules();
+}
+
+function renderRules() {
+  if (!REC.rules) return;
+  var q = (el('rule-search').value || '').trim().toLowerCase();
+  var list = REC.rules.filter(function (r) {
+    if (r.kind !== REC.kind) return false;
+    if (!q) return true;
+    return (r.code + ' ' + r.name + ' ' + r.category).toLowerCase().indexOf(q) >= 0;
+  });
+
+  if (!list.length) {
+    el('rule-list').innerHTML = '<div class="empty small">ไม่พบหลักเกณฑ์ที่ค้นหา</div>';
+    el('rule-count').textContent = '';
+    return;
+  }
+
+  // จัดกลุ่มตามหมวดเพื่อให้หาเจอเร็วขึ้น ตอนนี้มีเกณฑ์รวมกันเกือบร้อยข้อ
+  var groups = [], seen = {};
+  list.forEach(function (r) {
+    var cat = r.category || 'ทั่วไป';
+    if (!seen[cat]) { seen[cat] = { name: cat, items: [] }; groups.push(seen[cat]); }
+    seen[cat].items.push(r);
+  });
+
+  el('rule-count').textContent = list.length + ' ข้อ';
+  el('rule-list').innerHTML = groups.map(function (g) {
+    return '<div style="position:sticky;top:0;z-index:1;background:var(--surface-2);padding:5px 13px;' +
+        'font-size:11.5px;font-weight:700;color:var(--ink-2)">' + esc(g.name) + '</div>' +
+      g.items.map(function (r) {
+        var sev = r.severity ? ['', 'เบา', 'ปานกลาง', 'ร้ายแรง', 'ร้ายแรงมาก'][r.severity] : '';
+        return '<div class="pick-item' + (REC.rule && REC.rule.id === r.id ? ' on' : '') +
+          '" onclick="pickRule(' + r.id + ')">' +
+          '<div class="grow"><b>' + esc(r.name) + '</b>' +
+            '<span>' + esc(r.code) + (r.oldCode ? ' (รหัสเดิม ' + esc(r.oldCode) + ')' : '') +
+            (sev ? ' · ระดับ' + sev : '') +
+            (r.requiresEvidence ? ' · ต้องมีหลักฐาน' : '') + '</span></div>' +
+          '<div class="pick-pts" style="color:' +
+            (r.kind === 'ความดี' ? 'var(--series-1)' : 'var(--series-2)') + '">' +
+            (r.kind === 'ความดี' ? '+' : '−') + r.points + '</div>' +
+        '</div>';
+      }).join('');
+  }).join('');
+}
+
+function pickRule(id) {
+  REC.rule = REC.rules.filter(function (r) { return r.id === id; })[0];
+  el('evidence-field').classList.toggle('hide', !REC.rule.requiresEvidence);
+  renderRules();
+}
+
+function renderStudentPicker() {
+  el('rec-student').innerHTML = REC.student
+    ? '<div class="pick-item on" onclick="openStudentPicker()" style="border-radius:10px;border:1px solid var(--line)">' +
+        '<div class="avatar">' + esc(initials(REC.student.name)) + '</div>' +
+        '<div class="grow"><b>' + esc(REC.student.name) + '</b>' +
+        '<span>' + esc(REC.student.classLabel) + ' · รหัส ' + esc(REC.student.code) +
+        ' · คะแนน ' + REC.student.conductScore + '</span></div>' +
+        '<span class="btn btn-ghost btn-sm">เปลี่ยน</span></div>'
+    : '<button class="btn btn-block" onclick="openStudentPicker()" style="justify-content:flex-start">' +
+        '🔍 ค้นหาชื่อหรือรหัสนักเรียน</button>';
+}
+
+function openStudentPicker() {
+  openModal('เลือกนักเรียน',
+    '<input type="search" id="sp-q" placeholder="พิมพ์ชื่อ นามสกุล รหัส หรือห้อง เช่น ม.1/1" ' +
+      'autocomplete="off" style="margin-bottom:10px">' +
+    '<div id="sp-list"><div class="empty small">พิมพ์อย่างน้อย 1 ตัวอักษรเพื่อค้นหา</div></div>');
+
+  var input = el('sp-q');
+  var timer;
+  input.oninput = function () {
+    clearTimeout(timer);
+    var q = input.value.trim();
+    if (!q) { el('sp-list').innerHTML = '<div class="empty small">พิมพ์อย่างน้อย 1 ตัวอักษรเพื่อค้นหา</div>'; return; }
+    el('sp-list').innerHTML = '<div class="skeleton" style="height:60px"></div>';
+    timer = setTimeout(function () {
+      call('apiSearchStudents', [S.token, q, { limit: 25 }]).then(function (list) {
+        el('sp-list').innerHTML = list.length
+          ? '<div class="pick-list">' + list.map(function (s) {
+              return '<div class="pick-item" onclick="chooseStudent(' + s.id + ')">' +
+                '<div class="avatar">' + esc(initials(s.name)) + '</div>' +
+                '<div class="grow"><b>' + esc(s.name) + '</b><span>' + esc(s.classLabel) +
+                  ' · เลขที่ ' + esc(s.seat) + ' · รหัส ' + esc(s.code) + '</span></div>' +
+                '<div class="pick-pts" style="color:' + scoreColor(s.conductScore) + '">' + s.conductScore + '</div>' +
+              '</div>';
+            }).join('') + '</div>'
+          : '<div class="empty small">ไม่พบนักเรียนที่ค้นหา</div>';
+        window._spList = list;
+      }).catch(function (e) {
+        el('sp-list').innerHTML = '<div class="alert alert-error">' + esc(e.message) + '</div>';
+      });
+    }, 280);
+  };
+  setTimeout(function () { input.focus(); }, 80);
+}
+
+function chooseStudent(id) {
+  REC.student = (window._spList || []).filter(function (s) { return s.id === id; })[0];
+  closeModal();
+  renderStudentPicker();
+}
+
+function submitRecord(btn) {
+  if (!REC.student) { toast('กรุณาเลือกนักเรียนก่อน', 'err'); return; }
+  if (!REC.rule) { toast('กรุณาเลือกหลักเกณฑ์', 'err'); return; }
+  var detail = el('rec-detail').value.trim();
+  if (!detail) { toast('กรุณากรอกรายละเอียดเหตุการณ์', 'err'); el('rec-detail').focus(); return; }
+
+  var when = el('rec-when').value;
+  busy(btn, true);
+  call('apiCreateRecord', [S.token, {
+    studentId: REC.student.id,
+    ruleId: REC.rule.id,
+    detail: detail,
+    location: el('rec-place').value.trim(),
+    occurredAt: when ? when.replace('T', ' ') + ':00' : '',
+    evidenceUrl: el('rec-evidence') ? el('rec-evidence').value.trim() : ''
+  }]).then(function (res) {
+    busy(btn, false, 'บันทึกและส่งให้พิจารณา');
+    toast('บันทึก ' + res.recordNo + ' ส่งให้พิจารณาแล้ว', 'ok');
+    REC.student = null; REC.rule = null;
+    el('rec-detail').value = ''; el('rec-place').value = '';
+    if (el('rec-evidence')) el('rec-evidence').value = '';
+    el('evidence-field').classList.add('hide');
+    renderStudentPicker();
+    renderRules();
+    loadMyRecords();
+  }).catch(function (e) {
+    busy(btn, false, 'บันทึกและส่งให้พิจารณา');
+    toast(e.message, 'err');
+  });
+}
+
+function loadMyRecords() {
+  var box = el('my-records');
+  if (!box) return;
+  call('apiMyRecords', [S.token, 20]).then(function (list) {
+    box.innerHTML = list.length
+      ? '<div class="table-wrap"><table class="data"><thead><tr>' +
+          '<th>นักเรียน</th><th>เกณฑ์</th><th class="num">คะแนน</th><th>สถานะ</th></tr></thead><tbody>' +
+        list.map(function (r) {
+          return '<tr><td><b>' + esc(r.studentName) + '</b><div class="small muted">' + esc(r.classLabel) +
+            ' · ' + esc(r.occurredThai) + '</div></td>' +
+            '<td>' + esc(r.ruleName) + '</td>' +
+            '<td class="num" style="color:' + (r.kind === 'ความดี' ? 'var(--series-1)' : 'var(--series-2)') +
+              ';font-weight:700">' + (r.kind === 'ความดี' ? '+' : '−') + r.points + '</td>' +
+            '<td>' + statusBadge(r.status) +
+              (r.reviewNote ? '<div class="small muted">' + esc(r.reviewNote) + '</div>' : '') + '</td></tr>';
+        }).join('') + '</tbody></table></div>'
+      : '<div class="empty"><div class="big">📝</div>ยังไม่มีบันทึกของคุณ</div>';
+  }).catch(function (e) {
+    box.innerHTML = '<div class="alert alert-error">' + esc(e.message) + '</div>';
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* 3. รออนุมัติ                                                        */
+/* ------------------------------------------------------------------ */
+
+VIEWS.approve = function (root) {
+  return call('apiPendingRecords', [S.token]).then(function (list) {
+    updatePendingBadge(list.length);
+    if (!list.length) {
+      root.innerHTML = '<div class="card"><div class="empty"><div class="big">🎉</div>' +
+        '<b>ไม่มีบันทึกค้างพิจารณา</b><div class="small">บันทึกที่ส่งเข้ามาใหม่จะแสดงที่นี่</div></div></div>';
+      return;
+    }
+
+    root.innerHTML =
+      '<div class="card" style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">' +
+        '<span style="font-size:20px">⏳</span>' +
+        '<div style="flex:1;min-width:200px"><b>รอพิจารณา ' + list.length + ' รายการ</b>' +
+        '<div class="small muted">บันทึกจะมีผลต่อคะแนนนักเรียนเมื่ออนุมัติแล้วเท่านั้น ' +
+        'ความผิดระดับร้ายแรงต้องให้ฝ่ายกิจการนักเรียนพิจารณา</div></div></div></div>' +
+      '<div class="grid" style="gap:12px">' + list.map(pendingCard).join('') + '</div>';
+  });
+};
+
+function pendingCard(r) {
+  var isMerit = r.kind === 'ความดี';
+  var sevText = r.severity ? ['', 'เบา', 'ปานกลาง', 'ร้ายแรง', 'ร้ายแรงมาก'][r.severity] : '';
+  return '<div class="card" id="pc-' + r.id + '">' +
+    '<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">' +
+      '<div class="avatar" style="width:42px;height:42px;flex:0 0 42px;font-size:16px">' +
+        esc(initials(r.studentName)) + '</div>' +
+      '<div style="flex:1;min-width:200px">' +
+        '<b style="font-size:15.5px">' + esc(r.studentName) + '</b>' +
+        '<div class="small muted">' + esc(r.classLabel) + ' · รหัส ' + esc(r.studentCode) + '</div>' +
+      '</div>' +
+      '<div style="text-align:right">' +
+        '<span class="badge ' + (isMerit ? 'badge-merit' : 'badge-demerit') + '">' +
+          (isMerit ? '🌟 ' : '⚠️ ') + esc(r.kind) + '</span>' +
+        '<div style="font-size:21px;font-weight:700;color:' +
+          (isMerit ? 'var(--series-1)' : 'var(--series-2)') + '">' +
+          (isMerit ? '+' : '−') + r.points + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="divider" style="margin:12px 0"></div>' +
+    '<div style="font-size:14.5px;font-weight:600;margin-bottom:3px">' + esc(r.ruleCode) + ' ' + esc(r.ruleName) +
+      (sevText ? ' <span class="badge">ระดับ' + esc(sevText) + '</span>' : '') + '</div>' +
+    '<p style="font-size:14px;margin:6px 0">' + esc(r.detail) + '</p>' +
+    '<div class="small muted">' + esc(r.occurredThai) +
+      (r.location ? ' · ' + esc(r.location) : '') + ' · บันทึกโดย ' + esc(r.reportedBy) + '</div>' +
+    (r.evidenceUrl ? '<div style="margin-top:8px"><a href="' + esc(r.evidenceUrl) +
+      '" target="_blank" rel="noopener" class="btn btn-sm">📎 เปิดดูหลักฐาน</a></div>' : '') +
+    (r.canDecide
+      ? '<div style="display:flex;gap:9px;margin-top:14px;flex-wrap:wrap">' +
+          '<button class="btn btn-good" style="flex:1" onclick="decide(' + r.id + ',\'approve\',this)">✓ อนุมัติ</button>' +
+          '<button class="btn" style="flex:1" onclick="openReject(' + r.id + ')">✕ ไม่อนุมัติ</button>' +
+        '</div>'
+      : '<div class="alert alert-warn" style="margin:14px 0 0">⚠ ความผิดระดับร้ายแรง ' +
+        'ต้องให้ฝ่ายกิจการนักเรียนเป็นผู้พิจารณา</div>') +
+  '</div>';
+}
+
+function decide(id, decision, btn, note) {
+  busy(btn, true);
+  call('apiReviewRecord', [S.token, id, decision, note || ''])
+    .then(function () {
+      var card = el('pc-' + id);
+      if (card) {
+        card.style.transition = 'opacity .25s, transform .25s';
+        card.style.opacity = '0'; card.style.transform = 'scale(.97)';
+        setTimeout(function () { card.remove(); }, 260);
+      }
+      updatePendingBadge(Math.max(0, S.pendingCount - 1));
+      toast(decision === 'approve' ? 'อนุมัติแล้ว คะแนนได้รับการปรับปรุง' : 'บันทึกไม่ได้รับอนุมัติ', 'ok');
+    })
+    .catch(function (e) { busy(btn, false); toast(e.message, 'err'); });
+}
+
+function openReject(id) {
+  openModal('ไม่อนุมัติบันทึก',
+    '<div class="field"><label>เหตุผล <span class="muted">(ผู้บันทึกจะเห็นข้อความนี้)</span></label>' +
+    '<textarea id="rj-note" placeholder="เช่น ข้อมูลไม่เพียงพอ ควรระบุพยานหรือแนบหลักฐาน"></textarea></div>',
+    '<button class="btn" onclick="closeModal()">ยกเลิก</button>' +
+    '<button class="btn btn-danger" id="rj-ok">ไม่อนุมัติ</button>');
+  el('rj-ok').onclick = function () {
+    var note = el('rj-note').value.trim();
+    if (!note) { toast('กรุณาระบุเหตุผล', 'err'); return; }
+    closeModal();
+    decide(id, 'reject', null, note);
+  };
+}
+</script>
+
+<script>
+/* ------------------------------------------------------------------ */
+/* 4. นักเรียน                                                         */
+/* ------------------------------------------------------------------ */
+
+var STU = { grade: '', room: '', q: '' };
+
+VIEWS.students = function (root) {
+  root.innerHTML =
+    '<div class="card" style="margin-bottom:14px">' +
+      '<div class="row" style="align-items:flex-end">' +
+        '<div class="field" style="flex:2;margin-bottom:0"><label>ค้นหา</label>' +
+          '<input type="search" id="stu-q" placeholder="ชื่อ นามสกุล หรือรหัสนักเรียน" value="' + esc(STU.q) + '"></div>' +
+        '<div class="field" style="flex:1;margin-bottom:0"><label>ระดับชั้น</label>' +
+          '<select id="stu-grade"><option value="">ทุกระดับ</option>' +
+            [1,2,3,4,5,6].map(function (g) {
+              return '<option value="' + g + '"' + (String(STU.grade) === String(g) ? ' selected' : '') +
+                     '>ม.' + g + '</option>';
+            }).join('') + '</select></div>' +
+        '<div class="field" style="flex:1;margin-bottom:0"><label>ห้อง</label>' +
+          '<input type="number" id="stu-room" min="1" placeholder="ทุกห้อง" value="' + esc(STU.room) + '"></div>' +
+        '<button class="btn btn-primary" onclick="loadStudents()" style="flex:0 0 auto">ค้นหา</button>' +
+        (S.perm['student.manage']
+          ? '<button class="btn" onclick="openStudentForm()" style="flex:0 0 auto">+ เพิ่มนักเรียน</button>' : '') +
+      '</div>' +
+    '</div>' +
+    '<div class="card"><div id="stu-result"><div class="skeleton" style="height:200px"></div></div></div>';
+
+  ['stu-q'].forEach(function (id) {
+    el(id).addEventListener('keydown', function (e) { if (e.key === 'Enter') loadStudents(); });
+  });
+  return loadStudents();
+};
+
+function loadStudents() {
+  STU.q = el('stu-q').value.trim();
+  STU.grade = el('stu-grade').value;
+  STU.room = el('stu-room').value;
+  var box = el('stu-result');
+  box.innerHTML = '<div class="skeleton" style="height:200px"></div>';
+
+  return call('apiSearchStudents', [S.token, STU.q, { grade: STU.grade, room: STU.room, limit: 400 }])
+    .then(function (list) {
+      if (!list.length) {
+        box.innerHTML = '<div class="empty"><div class="big">🔍</div>ไม่พบนักเรียนตามเงื่อนไขที่ค้นหา</div>';
+        return;
+      }
+      box.innerHTML =
+        '<div class="card-head"><h3>พบ ' + list.length + ' คน</h3>' +
+          '<span class="hint">แตะที่แถวเพื่อดูประวัติรายบุคคล</span></div>' +
+        '<div class="table-wrap"><table class="data"><thead><tr>' +
+          '<th>นักเรียน</th><th>ห้อง</th><th class="num">คะแนนความประพฤติ</th>' +
+          '<th class="num">ความดีสะสม</th><th class="num">ครั้งที่ทำผิด</th><th>ระดับ</th>' +
+        '</tr></thead><tbody>' +
+        list.map(function (s) {
+          return '<tr class="clickable" onclick="openStudent(' + s.id + ')">' +
+            '<td><b>' + esc(s.name) + '</b><div class="small muted">รหัส ' + esc(s.code) +
+              ' · เลขที่ ' + esc(s.seat) + '</div></td>' +
+            '<td>' + esc(s.classLabel) + '</td>' +
+            '<td class="num"><b style="color:' + scoreColor(s.conductScore) + '">' + s.conductScore + '</b></td>' +
+            '<td class="num">' + s.meritTotal + '</td>' +
+            '<td class="num">' + (s.demeritCount || '—') + '</td>' +
+            '<td>' + riskBadge(s.riskLevel) + '</td></tr>';
+        }).join('') + '</tbody></table></div>';
+    });
+}
+
+function openStudent(id) {
+  openModal('ประวัติความประพฤติ', '<div class="skeleton" style="height:260px"></div>');
+  call('apiGetStudent', [S.token, id]).then(function (d) {
+    var s = d.student, b = d.balance;
+    openModal(s.name,
+      '<div style="display:flex;gap:14px;align-items:center;margin-bottom:16px;flex-wrap:wrap">' +
+        '<div class="avatar" style="width:52px;height:52px;flex:0 0 52px;font-size:20px">' +
+          esc(initials(s.name)) + '</div>' +
+        '<div style="flex:1;min-width:150px"><b style="font-size:16px">' + esc(s.name) + '</b>' +
+          '<div class="small muted">' + esc(s.classLabel) + ' · เลขที่ ' + esc(s.seat) +
+          ' · รหัส ' + esc(s.code) + '</div></div>' +
+        '<div style="text-align:right"><div style="font-size:30px;font-weight:700;color:' +
+          scoreColor(b.conductScore) + '">' + b.conductScore + '</div>' +
+          '<div class="small muted">คะแนนความประพฤติ</div></div>' +
+      '</div>' +
+
+      '<div style="margin-bottom:6px">' + riskBadge(b.riskLevel) + '</div>' +
+      (b.riskAction && b.riskLevel !== 'ปกติ'
+        ? '<div class="alert alert-warn" style="margin-bottom:14px">⚠ การดำเนินการที่ต้องทำ: ' +
+          esc(b.riskAction) + '</div>' : '') +
+
+      '<div class="grid grid-3" style="gap:10px;margin-bottom:16px">' +
+        miniStat('ความดีสะสม', b.meritTotal, b.meritCount + ' ครั้ง', 'var(--series-1)') +
+        miniStat('คะแนนที่ถูกหัก', b.demeritTotal, b.demeritCount + ' ครั้ง', 'var(--series-2)') +
+        miniStat('ยินยอมเผยแพร่', s.publishConsent ? 'ยินยอม' : 'ไม่ยินยอม',
+          s.publishConsent ? 'แสดงชื่อเต็มได้' : 'ระบบจะปกปิดนามสกุล', 'var(--ink-2)') +
+      '</div>' +
+
+      '<div class="card-head"><h3>แนวโน้มคะแนนปีการศึกษานี้</h3></div>' +
+      '<div id="stu-spark" style="margin-bottom:16px"></div>' +
+
+      '<div class="card-head"><h3>ประวัติทั้งหมด</h3>' +
+        '<span class="hint">' + d.history.length + ' รายการ</span></div>' +
+      (d.history.length
+        ? '<div class="table-wrap"><table class="data"><thead><tr><th>วันที่</th><th>รายการ</th>' +
+          '<th class="num">คะแนน</th><th>สถานะ</th></tr></thead><tbody>' +
+          d.history.map(function (h) {
+            return '<tr><td class="small">' + esc(h.occurredThai) + '</td>' +
+              '<td><b>' + esc(h.ruleName) + '</b><div class="small muted">' + esc(h.detail) +
+                '<br>โดย ' + esc(h.reportedBy) + '</div></td>' +
+              '<td class="num" style="font-weight:700;color:' +
+                (h.kind === 'ความดี' ? 'var(--series-1)' : 'var(--series-2)') + '">' +
+                (h.kind === 'ความดี' ? '+' : '−') + h.points + '</td>' +
+              '<td>' + statusBadge(h.status) +
+                (S.perm['record.revoke'] && h.status === 'อนุมัติแล้ว'
+                  ? '<div><button class="btn btn-ghost btn-sm" onclick="openRevoke(' + h.id + ',' + id +
+                    ')">เพิกถอน</button></div>' : '') + '</td></tr>';
+          }).join('') + '</tbody></table></div>'
+        : '<div class="empty small">ยังไม่มีประวัติในระบบ</div>'),
+
+      (S.perm['report.view']
+        ? '<button class="btn" onclick="closeModal();exportStudentReport(' + id + ')">📄 ออกรายงานรายบุคคล</button>' : '') +
+      (S.perm['student.manage']
+        ? '<button class="btn" onclick=\'openStudentForm(' + JSON.stringify(s).replace(/'/g, '&#39;') +
+          ')\'>✏️ แก้ไขข้อมูล</button>' : '') +
+      '<button class="btn btn-primary" onclick="closeModal()">ปิด</button>');
+
+    sparkScore('stu-spark', d.timeline, 100);
+  }).catch(function (e) {
+    openModal('เกิดข้อผิดพลาด', '<div class="alert alert-error">⚠ ' + esc(e.message) + '</div>',
+      '<button class="btn" onclick="closeModal()">ปิด</button>');
+  });
+}
+
+function miniStat(label, value, foot, color) {
+  return '<div style="background:var(--surface-2);border-radius:10px;padding:10px 12px">' +
+    '<div class="small muted">' + esc(label) + '</div>' +
+    '<div style="font-size:19px;font-weight:700;color:' + color + '">' + esc(value) + '</div>' +
+    '<div class="small muted">' + esc(foot) + '</div></div>';
+}
+
+function openRevoke(recordId, studentId) {
+  openModal('เพิกถอนบันทึก',
+    '<div class="alert alert-warn">⚠ การเพิกถอนจะคืนคะแนนให้นักเรียนทันที ' +
+      'และมีการบันทึกร่องรอยไว้ตรวจสอบได้</div>' +
+    '<div class="field"><label>เหตุผลในการเพิกถอน</label>' +
+    '<textarea id="rv-note" placeholder="เช่น อุทธรณ์สำเร็จ พบว่าบันทึกผิดตัว"></textarea></div>',
+    '<button class="btn" onclick="closeModal()">ยกเลิก</button>' +
+    '<button class="btn btn-danger" id="rv-ok">เพิกถอน</button>');
+  el('rv-ok').onclick = function () {
+    var note = el('rv-note').value.trim();
+    if (!note) { toast('กรุณาระบุเหตุผล', 'err'); return; }
+    var btn = this; busy(btn, true);
+    call('apiRevokeRecord', [S.token, recordId, note]).then(function () {
+      closeModal();
+      toast('เพิกถอนบันทึกและคืนคะแนนแล้ว', 'ok');
+      openStudent(studentId);
+    }).catch(function (e) { busy(btn, false, 'เพิกถอน'); toast(e.message, 'err'); });
+  };
+}
+
+function openStudentForm(s) {
+  s = s || {};
+  openModal(s.id ? 'แก้ไขข้อมูลนักเรียน' : 'เพิ่มนักเรียน',
+    '<div class="row"><div class="field"><label>รหัสประจำตัวนักเรียน</label>' +
+      '<input id="sf-code" type="text" value="' + esc(s.code || '') + '"></div>' +
+      '<div class="field"><label>คำนำหน้า</label><input id="sf-prefix" type="text" value="' +
+        esc(s.prefix || '') + '" placeholder="เด็กชาย / นางสาว"></div></div>' +
+    '<div class="row"><div class="field"><label>ชื่อ</label><input id="sf-first" type="text" value="' +
+      esc(s.firstName || '') + '"></div>' +
+      '<div class="field"><label>นามสกุล</label><input id="sf-last" type="text" value="' +
+        esc(s.lastName || '') + '"></div></div>' +
+    '<div class="row"><div class="field"><label>ระดับชั้น</label><select id="sf-grade">' +
+      [1,2,3,4,5,6].map(function (g) {
+        return '<option value="' + g + '"' + (Number(s.grade) === g ? ' selected' : '') + '>ม.' + g + '</option>';
+      }).join('') + '</select></div>' +
+      '<div class="field"><label>ห้อง</label><input id="sf-room" type="number" min="1" value="' +
+        esc(s.room || 1) + '"></div>' +
+      '<div class="field"><label>เลขที่</label><input id="sf-seat" type="number" min="1" value="' +
+        esc(s.seat || '') + '"></div></div>' +
+    '<div class="row"><div class="field"><label>ชื่อผู้ปกครอง</label><input id="sf-gname" type="text" value="' +
+      esc(s.guardianName || '') + '"></div>' +
+      '<div class="field"><label>โทรศัพท์ผู้ปกครอง</label><input id="sf-gphone" type="text" value="' +
+        esc(s.guardianPhone || '') + '"></div></div>' +
+    '<div class="field"><label style="display:flex;gap:9px;align-items:flex-start;font-weight:400">' +
+      '<input type="checkbox" id="sf-consent" style="width:auto;min-height:0;margin-top:3px"' +
+        (s.publishConsent ? ' checked' : '') + '>' +
+      '<span>ผู้ปกครองยินยอมให้เผยแพร่ชื่อ-สกุลบนกระดานเกียรติยศสาธารณะ (ตาม PDPA)<br>' +
+      '<span class="small muted">ถ้าไม่ติ๊ก ระบบจะแสดงเป็น "ธนา ข." โดยอัตโนมัติ</span></span></label></div>' +
+    '<div id="sf-error"></div>',
+    '<button class="btn" onclick="closeModal()">ยกเลิก</button>' +
+    '<button class="btn btn-primary" id="sf-save">บันทึก</button>');
+
+  el('sf-save').onclick = function () {
+    var btn = this; busy(btn, true);
+    call('apiSaveStudent', [S.token, {
+      id: s.id || null, code: el('sf-code').value, prefix: el('sf-prefix').value,
+      firstName: el('sf-first').value, lastName: el('sf-last').value,
+      grade: el('sf-grade').value, room: el('sf-room').value, seat: el('sf-seat').value,
+      guardianName: el('sf-gname').value, guardianPhone: el('sf-gphone').value,
+      publishConsent: el('sf-consent').checked
+    }]).then(function () {
+      closeModal(); toast('บันทึกข้อมูลนักเรียนเรียบร้อย', 'ok');
+      if (S.view === 'students') loadStudents();
+    }).catch(function (e) {
+      busy(btn, false, 'บันทึก');
+      el('sf-error').innerHTML = '<div class="alert alert-error">⚠ ' + esc(e.message) + '</div>';
+    });
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* 5. กระดานเกียรติยศ                                                   */
+/* ------------------------------------------------------------------ */
+
+VIEWS.board = function (root) {
+  return call('apiLeaderboard', [S.token]).then(function (d) {
+    root.innerHTML =
+      '<div class="card" style="margin-bottom:16px">' +
+        '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">' +
+          '<span style="font-size:26px">🏅</span>' +
+          '<div style="flex:1;min-width:220px"><b>นักเรียนคะแนนความดีสูงสุด</b>' +
+            '<div class="small muted">เงื่อนไข: ไม่เคยมีบันทึกความผิดที่อนุมัติแล้ว ' +
+            'คะแนนความประพฤติเต็ม 100 และมีคะแนนความดีอย่างน้อย 1 คะแนน</div></div>' +
+          (S.perm['leaderboard.publish']
+            ? '<button class="btn btn-primary" onclick="doPublishBoard(this)">📢 ประกาศขึ้นหน้าเว็บ</button>' : '') +
+        '</div>' +
+        (d.publishedAtThai
+          ? '<div class="small muted" style="margin-top:10px">ประกาศบนหน้าเว็บสาธารณะล่าสุดเมื่อ ' +
+            esc(d.publishedAtThai) + '</div>'
+          : '<div class="alert alert-warn" style="margin:10px 0 0">⚠ ยังไม่เคยประกาศขึ้นหน้าเว็บสาธารณะ</div>') +
+      '</div>' +
+
+      '<div class="grid grid-2">' +
+        boardCard('มัธยมศึกษาตอนต้น (ม.1–3)', d.lower) +
+        boardCard('มัธยมศึกษาตอนปลาย (ม.4–6)', d.upper) +
+      '</div>';
+  });
+};
+
+function boardCard(title, items) {
+  return '<div class="card"><div class="card-head"><h3>' + esc(title) + '</h3>' +
+    '<span class="hint">' + items.length + ' คน</span></div>' +
+    (items.length
+      ? items.map(function (c) {
+          return '<div class="rank-item">' +
+            '<div class="rank-no rank-' + c.rank + '">' + c.rank + '</div>' +
+            '<div class="rank-name"><b>' + esc(c.displayName) + '</b>' +
+              '<span>' + esc(c.classLabel) + ' · ทำความดี ' + c.meritCount + ' ครั้ง</span></div>' +
+            '<div class="rank-score">' + c.meritTotal + ' <small>คะแนน</small></div></div>';
+        }).join('')
+      : '<div class="empty"><div class="big">🌱</div>ยังไม่มีนักเรียนที่เข้าเกณฑ์ในระดับนี้' +
+        '<div class="small" style="margin-top:6px">เริ่มบันทึกความดีให้นักเรียนได้เลย</div></div>') +
+  '</div>';
+}
+
+function doPublishBoard(btn) {
+  confirmAction('ประกาศกระดานเกียรติยศ',
+    'ระบบจะบันทึกอันดับ ณ ขณะนี้ขึ้นหน้าเว็บสาธารณะ ' +
+    'ชื่อนักเรียนที่ผู้ปกครองไม่ได้ให้ความยินยอมจะถูกปกปิดนามสกุลโดยอัตโนมัติ',
+    function () {
+      busy(btn, true);
+      call('apiPublishLeaderboard', [S.token]).then(function (r) {
+        busy(btn, false, '📢 ประกาศขึ้นหน้าเว็บ');
+        toast('ประกาศเรียบร้อย ' + r.count + ' รายการ', 'ok');
+        go('board');
+      }).catch(function (e) { busy(btn, false, '📢 ประกาศขึ้นหน้าเว็บ'); toast(e.message, 'err'); });
+    });
+}
+
+/* ------------------------------------------------------------------ */
+/* 6. รายงาน                                                           */
+/* ------------------------------------------------------------------ */
+
+var RPT = { id: 'R05', params: {}, current: null };
+
+VIEWS.reports = function (root) {
+  return call('apiListReports', [S.token]).then(function (list) {
+    root.innerHTML =
+      '<div class="card" style="margin-bottom:14px">' +
+        '<div class="card-head"><h3>เลือกรายงาน</h3>' +
+          '<span class="hint">ออกได้ทั้งไฟล์ Excel และ PDF</span></div>' +
+        '<div class="chips" style="margin-bottom:14px">' +
+          list.map(function (r) {
+            return '<button class="chip' + (RPT.id === r.id ? ' on' : '') +
+              '" data-rpt="' + r.id + '" onclick="pickReport(\'' + r.id + '\')">' +
+              esc(r.id) + ' ' + esc(r.name) + '</button>';
+          }).join('') +
+        '</div>' +
+        '<div id="rpt-params"></div>' +
+        '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:6px">' +
+          '<button class="btn btn-primary" onclick="runReport(this)">👁 แสดงตัวอย่าง</button>' +
+          '<button class="btn" onclick="downloadReport(\'xlsx\',this)">📊 ดาวน์โหลด Excel</button>' +
+          '<button class="btn" onclick="downloadReport(\'pdf\',this)">📄 ดาวน์โหลด PDF</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="rpt-result"></div>';
+
+    window._reportList = list;
+    renderReportParams();
+  });
+};
+
+function pickReport(id) {
+  RPT.id = id;
+  $$('[data-rpt]').forEach(function (c) { c.classList.toggle('on', c.getAttribute('data-rpt') === id); });
+  renderReportParams();
+  el('rpt-result').innerHTML = '';
+}
+
+function renderReportParams() {
+  var meta = (window._reportList || []).filter(function (r) { return r.id === RPT.id; })[0];
+  var box = el('rpt-params');
+  if (!meta || !meta.needs.length) {
+    box.innerHTML = RPT.id === 'R03'
+      ? '<div class="field" style="max-width:260px"><label>แสดงนักเรียนที่คะแนนไม่เกิน</label>' +
+        '<input type="number" id="rp-cutoff" value="70" min="1" max="100"></div>'
+      : '';
+    return;
+  }
+  if (meta.needs.indexOf('student') >= 0) {
+    box.innerHTML = '<div class="field"><label>เลือกนักเรียน</label>' +
+      '<div id="rp-student"><button class="btn" onclick="pickReportStudent()">🔍 ค้นหานักเรียน</button></div></div>';
+  } else if (meta.needs.indexOf('class') >= 0) {
+    box.innerHTML = '<div class="row" style="max-width:420px">' +
+      '<div class="field"><label>ระดับชั้น</label><select id="rp-grade">' +
+        [1,2,3,4,5,6].map(function (g) { return '<option value="' + g + '">ม.' + g + '</option>'; }).join('') +
+      '</select></div>' +
+      '<div class="field"><label>ห้อง</label><input type="number" id="rp-room" min="1" value="1"></div></div>';
+  }
+}
+
+function pickReportStudent() {
+  openStudentPicker();
+  window.chooseStudent = function (id) {
+    var s = (window._spList || []).filter(function (x) { return x.id === id; })[0];
+    RPT.params.studentId = id;
+    closeModal();
+    el('rp-student').innerHTML =
+      '<div class="pick-item on" style="border-radius:10px;border:1px solid var(--line)" ' +
+        'onclick="pickReportStudent()"><div class="avatar">' + esc(initials(s.name)) + '</div>' +
+        '<div class="grow"><b>' + esc(s.name) + '</b><span>' + esc(s.classLabel) + '</span></div>' +
+        '<span class="btn btn-ghost btn-sm">เปลี่ยน</span></div>';
+  };
+}
+
+function collectReportParams() {
+  var p = {};
+  if (el('rp-cutoff')) p.cutoff = el('rp-cutoff').value;
+  if (el('rp-grade')) { p.grade = el('rp-grade').value; p.room = el('rp-room').value; }
+  if (RPT.params.studentId) p.studentId = RPT.params.studentId;
+  return p;
+}
+
+function runReport(btn) {
+  busy(btn, true);
+  call('apiBuildReport', [S.token, RPT.id, collectReportParams()])
+    .then(function (r) {
+      busy(btn, false, '👁 แสดงตัวอย่าง');
+      RPT.current = r;
+      el('rpt-result').innerHTML =
+        '<div class="card">' +
+          '<div class="card-head"><div><h3>' + esc(r.title) + '</h3>' +
+            '<div class="small muted">' + esc(r.subtitle || '') + '</div></div>' +
+            '<div class="right"><span class="badge">' + r.rowCount + ' แถว</span></div></div>' +
+          (r.notes || []).map(function (n) {
+            return '<div class="alert alert-info">' + esc(n) + '</div>';
+          }).join('') +
+          '<div class="table-wrap"><table class="data"><thead><tr>' +
+            r.columns.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') +
+          '</tr></thead><tbody>' +
+            r.rows.map(function (row) {
+              return '<tr>' + row.map(function (cell, i) {
+                var isNum = typeof cell === 'number';
+                return '<td' + (isNum ? ' class="num"' : '') + '>' + esc(cell) + '</td>';
+              }).join('') + '</tr>';
+            }).join('') +
+          '</tbody></table></div>' +
+          '<div class="small muted" style="margin-top:12px">ออกรายงานเมื่อ ' + esc(r.generatedAt) +
+            ' โดย ' + esc(r.generatedBy) + ' · เอกสารนี้มีข้อมูลส่วนบุคคล โปรดใช้ในราชการเท่านั้น</div>' +
+        '</div>';
+      window.scrollTo({ top: el('rpt-result').offsetTop - 80, behavior: 'smooth' });
+    })
+    .catch(function (e) { busy(btn, false, '👁 แสดงตัวอย่าง'); toast(e.message, 'err'); });
+}
+
+function downloadReport(format, btn) {
+  busy(btn, true);
+  call('apiExportReport', [S.token, RPT.id, collectReportParams(), format])
+    .then(function (f) {
+      busy(btn, false, format === 'pdf' ? '📄 ดาวน์โหลด PDF' : '📊 ดาวน์โหลด Excel');
+      downloadBase64(f.fileName, f.mimeType, f.base64);
+      toast('สร้างไฟล์ ' + f.fileName + ' แล้ว', 'ok');
+    })
+    .catch(function (e) {
+      busy(btn, false, format === 'pdf' ? '📄 ดาวน์โหลด PDF' : '📊 ดาวน์โหลด Excel');
+      toast(e.message, 'err');
+    });
+}
+
+function exportStudentReport(studentId) {
+  RPT.id = 'R01';
+  RPT.params.studentId = studentId;
+  toast('กำลังสร้างรายงาน...');
+  call('apiExportReport', [S.token, 'R01', { studentId: studentId }, 'pdf'])
+    .then(function (f) { downloadBase64(f.fileName, f.mimeType, f.base64); toast('ดาวน์โหลดรายงานแล้ว', 'ok'); })
+    .catch(function (e) { toast(e.message, 'err'); });
+}
+
+/** แปลง base64 เป็นไฟล์แล้วสั่งดาวน์โหลดในเบราว์เซอร์ */
+function downloadBase64(fileName, mimeType, b64) {
+  try {
+    var bin = atob(b64);
+    var bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    var url = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+    var a = document.createElement('a');
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 2000);
+  } catch (e) {
+    toast('เบราว์เซอร์นี้บล็อกการดาวน์โหลด กรุณาลองใช้ Chrome หรือเปิดเว็บแอปในแท็บใหม่', 'err');
+  }
+}
+</script>
+
+<script>
+/* ------------------------------------------------------------------ */
+/* 7. ตั้งค่าระบบ                                                       */
+/* ------------------------------------------------------------------ */
+
+VIEWS.admin = function (root) {
+  var tabs = [
+    { id: 'settings', label: 'ค่าตั้งค่า' },
+    { id: 'rules',    label: 'หลักเกณฑ์คะแนน' },
+    { id: 'users',    label: 'ผู้ใช้งาน' },
+    { id: 'import',   label: 'นำเข้าข้อมูล' },
+    { id: 'tools',    label: 'เครื่องมือ' }
+  ];
+  if (S.perm['audit.view']) tabs.push({ id: 'audit', label: 'ร่องรอยการใช้งาน' });
+
+  root.innerHTML =
+    '<div class="chips" style="margin-bottom:14px">' +
+      tabs.map(function (t, i) {
+        return '<button class="chip' + (i === 0 ? ' on' : '') + '" data-tab="' + t.id +
+          '" onclick="adminTab(\'' + t.id + '\')">' + esc(t.label) + '</button>';
+      }).join('') +
+    '</div><div id="admin-body"></div>';
+
+  return adminTab('settings');
+};
+
+function adminTab(id) {
+  $$('[data-tab]').forEach(function (c) { c.classList.toggle('on', c.getAttribute('data-tab') === id); });
+  var box = el('admin-body');
+  box.innerHTML = '<div class="card"><div class="skeleton" style="height:160px"></div></div>';
+
+  if (id === 'settings') {
+    return call('apiGetSettings', [S.token]).then(function (list) {
+      box.innerHTML = '<div class="card">' +
+        '<div class="card-head"><h3>ค่าตั้งค่าระบบ</h3>' +
+          '<span class="hint">แก้ไขได้โดยไม่ต้องแก้โปรแกรม</span></div>' +
+        '<div class="alert alert-info">ℹ ค่าที่กระทบสิทธิของนักเรียน เช่น ขอบเขต "ไม่เคยกระทำผิด" ' +
+          'ควรผ่านความเห็นชอบของคณะกรรมการสถานศึกษาก่อนแก้ไข</div>' +
+        list.map(function (s) {
+          return '<div class="field"><label>' + esc(s.key) + '</label>' +
+            '<div style="display:flex;gap:8px">' +
+              '<input type="text" value="' + esc(s.value) + '" data-setting="' + esc(s.key) + '">' +
+              '<button class="btn btn-sm" onclick="saveSetting(\'' + esc(s.key) + '\',this)">บันทึก</button>' +
+            '</div>' + (s.description ? '<div class="help">' + esc(s.description) + '</div>' : '') + '</div>';
+        }).join('') + '</div>';
+    });
+  }
+
+  if (id === 'users') {
+    return call('apiListUsers', [S.token]).then(function (list) {
+      box.innerHTML = '<div class="card">' +
+        '<div class="card-head"><h3>ผู้ใช้งานระบบ</h3>' +
+          '<div class="right"><button class="btn btn-primary btn-sm" onclick="openUserForm()">+ เพิ่มผู้ใช้</button></div></div>' +
+        '<div class="table-wrap"><table class="data"><thead><tr><th>ชื่อผู้ใช้</th><th>ชื่อ-สกุล</th>' +
+          '<th>บทบาท</th><th>ขอบเขต</th><th>สถานะ</th><th>เข้าใช้ล่าสุด</th><th></th></tr></thead><tbody>' +
+        list.map(function (u) {
+          return '<tr><td><b>' + esc(u.username) + '</b></td><td>' + esc(u.name) + '</td>' +
+            '<td>' + esc(u.roleName) + '</td><td class="small">' + esc(u.scope || '—') + '</td>' +
+            '<td>' + (u.active ? '<span class="badge badge-good">ใช้งาน</span>'
+                               : '<span class="badge badge-crit">ระงับ</span>') + '</td>' +
+            '<td class="small muted">' + esc(u.lastLogin || 'ยังไม่เคย') + '</td>' +
+            '<td><button class="btn btn-ghost btn-sm" onclick=\'openUserForm(' +
+              JSON.stringify(u).replace(/'/g, '&#39;') + ')\'>แก้ไข</button></td></tr>';
+        }).join('') + '</tbody></table></div>' +
+        '<div class="alert alert-warn" style="margin-top:14px">⚠ ห้ามใช้บัญชีร่วมกันหลายคน ' +
+          'เพราะจะทำให้ร่องรอยการใช้งานไร้ความหมายและตรวจสอบความเป็นธรรมไม่ได้</div>' +
+      '</div>';
+    });
+  }
+
+  if (id === 'rules')  return renderRulesTab(box);
+  if (id === 'import') return renderImportTab(box);
+
+  if (id === 'tools') {
+    box.innerHTML = '<div class="grid grid-2">' +
+      '<div class="card"><div class="card-head"><h3>คำนวณคะแนนคงเหลือใหม่</h3></div>' +
+        '<p class="small muted">คำนวณคะแนนของนักเรียนทุกคนใหม่จากบันทึกที่อนุมัติแล้วทั้งหมด ' +
+        'ใช้เมื่อสงสัยว่ายอดคะแนนไม่ตรง หรือหลังแก้ไขข้อมูลในชีตโดยตรง</p>' +
+        '<button class="btn btn-primary" onclick="doRebuild(this)">เริ่มคำนวณใหม่</button></div>' +
+      '<div class="card"><div class="card-head"><h3>ประกาศกระดานเกียรติยศ</h3></div>' +
+        '<p class="small muted">บันทึกอันดับปัจจุบันขึ้นหน้าเว็บสาธารณะ ' +
+        'แนะนำให้ตั้ง Trigger ให้รันอัตโนมัติทุกเช้าเวลา 06:00 น.</p>' +
+        '<button class="btn btn-primary" onclick="doPublishBoard(this)">ประกาศตอนนี้</button></div>' +
+      '<div class="card span-2"><div class="card-head"><h3>ลิงก์หน้าเว็บสาธารณะ</h3></div>' +
+        '<p class="small muted">นำลิงก์นี้ไปฝังในเว็บไซต์โรงเรียน จะแสดงเฉพาะกระดานเกียรติยศ ' +
+        'ไม่มีข้อมูลด้านลบใด ๆ และไม่ต้องเข้าสู่ระบบ</p>' +
+        '<div style="display:flex;gap:8px"><input type="text" id="pub-url" readonly ' +
+          'value="' + esc(location.href.split('?')[0] + '?page=board') + '">' +
+          '<button class="btn" onclick="copyPublicUrl()">คัดลอก</button></div></div>' +
+    '</div>';
+    return Promise.resolve();
+  }
+
+  if (id === 'audit') {
+    return call('apiAuditLog', [S.token, 200]).then(function (list) {
+      box.innerHTML = '<div class="card"><div class="card-head"><h3>ร่องรอยการใช้งานล่าสุด</h3>' +
+        '<span class="hint">200 รายการล่าสุด</span></div>' +
+        '<div class="table-wrap"><table class="data"><thead><tr><th>เมื่อ</th><th>ผู้ใช้</th>' +
+          '<th>การกระทำ</th><th>เป้าหมาย</th><th>รายละเอียด</th></tr></thead><tbody>' +
+        list.map(function (a) {
+          return '<tr><td class="small mono">' + esc(a.at) + '</td>' +
+            '<td>' + esc(a.user) + '<div class="small muted">' + esc(a.role) + '</div></td>' +
+            '<td>' + esc(a.action) + '</td><td class="small">' + esc(a.target) + '</td>' +
+            '<td class="small muted">' + esc(a.detail) + '</td></tr>';
+        }).join('') + '</tbody></table></div></div>';
+    });
+  }
+  return Promise.resolve();
+}
+
+function saveSetting(key, btn) {
+  var input = $('[data-setting="' + key.replace(/"/g, '\\"') + '"]');
+  busy(btn, true);
+  call('apiSaveSetting', [S.token, key, input.value])
+    .then(function () { busy(btn, false, 'บันทึก'); toast('บันทึกค่า "' + key + '" แล้ว', 'ok'); })
+    .catch(function (e) { busy(btn, false, 'บันทึก'); toast(e.message, 'err'); });
+}
+
+function openUserForm(u) {
+  u = u || {};
+  var roles = [['admin','ผู้ดูแลระบบ'],['affairs','ฝ่ายกิจการนักเรียน'],['level_head','หัวหน้าระดับชั้น'],
+               ['homeroom','ครูที่ปรึกษา'],['teacher','ครูผู้สอน'],['executive','ผู้บริหาร']];
+  openModal(u.id ? 'แก้ไขผู้ใช้' : 'เพิ่มผู้ใช้',
+    '<div class="field"><label>ชื่อผู้ใช้ (ภาษาอังกฤษ)</label>' +
+      '<input id="uf-username" type="text" value="' + esc(u.username || '') + '" autocapitalize="none"></div>' +
+    '<div class="field"><label>ชื่อ-สกุล</label><input id="uf-name" type="text" value="' +
+      esc(u.name || '') + '"></div>' +
+    '<div class="field"><label>บทบาท</label><select id="uf-role">' +
+      roles.map(function (r) {
+        return '<option value="' + r[0] + '"' + (u.role === r[0] ? ' selected' : '') + '>' + r[1] + '</option>';
+      }).join('') + '</select></div>' +
+    '<div class="field"><label>ขอบเขตความรับผิดชอบ</label>' +
+      '<input id="uf-scope" type="text" value="' + esc(u.scope || '') + '" placeholder="เช่น 1/1,1/2">' +
+      '<div class="help">ครูที่ปรึกษาใส่ห้องคั่นด้วยจุลภาค เช่น 1/1,1/2 · ' +
+        'หัวหน้าระดับชั้นใส่ระดับ เช่น 1,2,3 · เว้นว่างหมายถึงเห็นทั้งโรงเรียน</div></div>' +
+    '<div class="field"><label>' + (u.id ? 'ตั้งรหัสผ่านใหม่ (เว้นว่างถ้าไม่เปลี่ยน)' : 'รหัสผ่านเริ่มต้น') + '</label>' +
+      '<input id="uf-pass" type="text" autocomplete="off" placeholder="อย่างน้อย 8 ตัวอักษร">' +
+      '<div class="help">ผู้ใช้จะถูกบังคับให้เปลี่ยนรหัสผ่านเมื่อเข้าใช้ครั้งแรก</div></div>' +
+    (u.id ? '<div class="field"><label style="display:flex;gap:9px;align-items:center;font-weight:400">' +
+      '<input type="checkbox" id="uf-active" style="width:auto;min-height:0"' +
+      (u.active !== false ? ' checked' : '') + '> เปิดใช้งานบัญชีนี้</label></div>' : '') +
+    '<div id="uf-error"></div>',
+    '<button class="btn" onclick="closeModal()">ยกเลิก</button>' +
+    '<button class="btn btn-primary" id="uf-save">บันทึก</button>');
+
+  el('uf-save').onclick = function () {
+    var btn = this; busy(btn, true);
+    call('apiSaveUser', [S.token, {
+      id: u.id || null, username: el('uf-username').value, name: el('uf-name').value,
+      role: el('uf-role').value, scope: el('uf-scope').value,
+      password: el('uf-pass').value, active: el('uf-active') ? el('uf-active').checked : true
+    }]).then(function () {
+      closeModal(); toast('บันทึกผู้ใช้เรียบร้อย', 'ok'); adminTab('users');
+    }).catch(function (e) {
+      busy(btn, false, 'บันทึก');
+      el('uf-error').innerHTML = '<div class="alert alert-error">⚠ ' + esc(e.message) + '</div>';
+    });
+  };
+}
+
+function doRebuild(btn) {
+  confirmAction('คำนวณคะแนนใหม่',
+    'ระบบจะคำนวณคะแนนของนักเรียนทุกคนใหม่จากบันทึกที่อนุมัติแล้ว อาจใช้เวลาสักครู่',
+    function () {
+      busy(btn, true);
+      call('apiRebuildBalances', [S.token]).then(function (r) {
+        busy(btn, false, 'เริ่มคำนวณใหม่');
+        toast('คำนวณคะแนนใหม่เรียบร้อย ' + r.count + ' คน', 'ok');
+      }).catch(function (e) { busy(btn, false, 'เริ่มคำนวณใหม่'); toast(e.message, 'err'); });
+    });
+}
+
+function copyPublicUrl() {
+  var input = el('pub-url');
+  input.select();
+  try {
+    navigator.clipboard.writeText(input.value);
+    toast('คัดลอกลิงก์แล้ว', 'ok');
+  } catch (e) {
+    document.execCommand('copy');
+    toast('คัดลอกลิงก์แล้ว', 'ok');
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 8. หน้าเว็บสาธารณะ — กระดานเกียรติยศ (ไม่ต้องเข้าสู่ระบบ)                */
+/*    แสดงเฉพาะข้อมูลด้านบวก ไม่มีคะแนนที่ถูกหักหรือรายชื่อผู้กระทำผิดใด ๆ      */
+/* ------------------------------------------------------------------ */
+
+function renderPublicBoard() {
+  el('root').innerHTML = '<div class="content" style="margin:0 auto;padding:26px 16px">' +
+    '<div class="skeleton" style="height:200px"></div></div>';
+
+  call('apiPublicLeaderboard', []).then(function (d) {
+    el('root').innerHTML =
+      '<div style="background:linear-gradient(140deg,var(--brand),var(--brand-2));color:#fff;' +
+        'padding:34px 20px;text-align:center">' +
+        '<div style="font-size:40px;line-height:1">🏅</div>' +
+        '<h1 style="font-size:24px;margin:8px 0 4px">กระดานเกียรติยศ</h1>' +
+        '<div style="opacity:.9;font-size:14.5px">' + esc(d.school) + ' · ปีการศึกษา ' + esc(d.year) + '</div>' +
+        (d.totalMeritActs
+          ? '<div style="margin-top:16px;display:inline-block;background:rgba(255,255,255,.16);' +
+            'padding:9px 18px;border-radius:20px;font-size:14px">' +
+            'ปีการศึกษานี้นักเรียนของเราทำความดีแล้ว <b>' + num(d.totalMeritActs) + '</b> ครั้ง</div>'
+          : '') +
+      '</div>' +
+      '<div class="content" style="margin:0 auto;padding:22px 16px 40px">' +
+        (d.lower.length || d.upper.length
+          ? '<div class="grid grid-2">' +
+              publicBoardCard('มัธยมศึกษาตอนต้น', 'ม.1 – ม.3', d.lower) +
+              publicBoardCard('มัธยมศึกษาตอนปลาย', 'ม.4 – ม.6', d.upper) +
+            '</div>'
+          : '<div class="card"><div class="empty"><div class="big">🌱</div>' +
+            '<b>ยังไม่มีการประกาศกระดานเกียรติยศ</b>' +
+            '<div class="small">โปรดติดตามเร็ว ๆ นี้</div></div></div>') +
+        (d.publishedAtThai
+          ? '<p class="small muted" style="text-align:center;margin-top:20px">ข้อมูล ณ ' +
+            esc(d.publishedAtThai) + '</p>' : '') +
+        '<p class="small muted" style="text-align:center;margin-top:6px">' +
+          'นักเรียนที่ปรากฏบนกระดานนี้เป็นผู้ที่ไม่เคยมีประวัติการกระทำผิด ' +
+          'และได้รับความยินยอมจากผู้ปกครองในการเผยแพร่ชื่อแล้ว</p>' +
+        (PUBLIC_MODE ? '' :
+          '<div style="text-align:center;margin-top:18px">' +
+          '<button class="btn" onclick="renderLogin()">← กลับหน้าเข้าสู่ระบบ</button></div>') +
+      '</div>';
+  }).catch(function (e) {
+    el('root').innerHTML = '<div class="content" style="margin:0 auto;padding:26px 16px">' +
+      '<div class="alert alert-error">⚠ ' + esc(e.message) + '</div>' +
+      (PUBLIC_MODE ? '' : '<button class="btn" onclick="renderLogin()">กลับหน้าเข้าสู่ระบบ</button>') + '</div>';
+  });
+}
+
+function publicBoardCard(title, sub, items) {
+  return '<div class="card">' +
+    '<div class="card-head"><div><h3>' + esc(title) + '</h3>' +
+      '<div class="small muted">' + esc(sub) + '</div></div></div>' +
+    (items.length
+      ? items.map(function (c) {
+          return '<div class="rank-item">' +
+            '<div class="rank-no rank-' + c.rank + '">' + c.rank + '</div>' +
+            '<div class="rank-name"><b>' + esc(c.displayName) + '</b>' +
+              '<span>' + esc(c.classLabel) + '</span></div>' +
+            '<div class="rank-score">' + c.meritTotal + ' <small>คะแนน</small></div></div>';
+        }).join('')
+      : '<div class="empty small">ยังไม่มีรายชื่อในระดับนี้</div>') +
+  '</div>';
+}
+</script>
+
+<script>
+/* ------------------------------------------------------------------ */
+/* 9. จัดการหลักเกณฑ์คะแนน                                              */
+/* ------------------------------------------------------------------ */
+
+var RULEMGR = { kind: 'ความดี', q: '', list: [] };
+
+function renderRulesTab(box) {
+  box.innerHTML = '<div class="card"><div class="skeleton" style="height:200px"></div></div>';
+  return call('apiListAllRules', [S.token]).then(function (list) {
+    RULEMGR.list = list;
+    drawRulesTable(box);
+  });
+}
+
+function drawRulesTable(box) {
+  box = box || el('admin-body');
+  var counts = { 'ความดี': 0, 'ความผิด': 0 };
+  RULEMGR.list.forEach(function (r) { counts[r.kind]++; });
+
+  var q = RULEMGR.q.trim().toLowerCase();
+  var rows = RULEMGR.list.filter(function (r) {
+    if (r.kind !== RULEMGR.kind) return false;
+    if (!q) return true;
+    return (r.code + ' ' + r.oldCode + ' ' + r.name + ' ' + r.category).toLowerCase().indexOf(q) >= 0;
+  });
+
+  box.innerHTML =
+    '<div class="card">' +
+      '<div class="card-head"><h3>หลักเกณฑ์คะแนน</h3>' +
+        '<div class="right">' +
+          '<button class="btn btn-primary btn-sm" onclick="openRuleForm()">+ เพิ่มเกณฑ์</button>' +
+        '</div></div>' +
+
+      '<div class="chips" style="margin-bottom:12px">' +
+        '<button class="chip' + (RULEMGR.kind === 'ความดี' ? ' on' : '') +
+          '" onclick="setRuleKind(\'ความดี\')">🌟 เกณฑ์ทำความดี (' + counts['ความดี'] + ')</button>' +
+        '<button class="chip' + (RULEMGR.kind === 'ความผิด' ? ' on' : '') +
+          '" onclick="setRuleKind(\'ความผิด\')">⚠️ เกณฑ์คะแนนไม่พึงประสงค์ (' + counts['ความผิด'] + ')</button>' +
+      '</div>' +
+
+      '<input type="search" id="rule-q" placeholder="ค้นหาชื่อเกณฑ์ รหัส หรือหมวด" value="' +
+        esc(RULEMGR.q) + '" oninput="RULEMGR.q=this.value;drawRulesTable();" style="margin-bottom:12px">' +
+
+      '<div class="table-wrap"><table class="data"><thead><tr>' +
+        '<th>รหัส</th><th>รหัสเดิม</th><th>ชื่อเกณฑ์</th><th class="num">คะแนน</th>' +
+        '<th>หมวด</th>' + (RULEMGR.kind === 'ความผิด' ? '<th>ระดับ</th>' : '<th>เพดาน/ภาคเรียน</th>') +
+        '<th>สถานะ</th><th>จัดการ</th>' +
+      '</tr></thead><tbody>' +
+      (rows.length ? rows.map(ruleRow).join('')
+        : '<tr><td colspan="8"><div class="empty small">ไม่พบเกณฑ์ที่ค้นหา</div></td></tr>') +
+      '</tbody></table></div>' +
+
+      '<div class="alert alert-info" style="margin-top:14px">ℹ ' +
+        'เกณฑ์ที่เคยถูกใช้บันทึกไปแล้วจะลบไม่ได้ ระบบจะปิดการใช้งานแทน ' +
+        'เพื่อไม่ให้ประวัติของนักเรียนที่อ้างอิงเกณฑ์นั้นเสียหาย · ' +
+        'การแก้ไขคะแนนมีผลกับบันทึกใหม่เท่านั้น บันทึกเดิมยังคงคะแนน ณ วันที่บันทึกไว้เหมือนเดิม</div>' +
+    '</div>';
+
+  var input = el('rule-q');
+  if (input && RULEMGR.q) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+}
+
+function ruleRow(r) {
+  var sevText = ['', 'เบา', 'ปานกลาง', 'ร้ายแรง', 'ร้ายแรงมาก'][r.severity] || '—';
+  var sevClass = { 1: 'badge', 2: 'badge-warn', 3: 'badge-serious', 4: 'badge-crit' }[r.severity] || 'badge';
+  return '<tr' + (r.active ? '' : ' style="opacity:.55"') + '>' +
+    '<td class="mono small">' + esc(r.code) + '</td>' +
+    '<td class="mono small muted">' + esc(r.oldCode || '—') + '</td>' +
+    '<td><b>' + esc(r.name) + '</b>' +
+      (r.requiresEvidence ? ' <span class="badge">ต้องมีหลักฐาน</span>' : '') + '</td>' +
+    '<td class="num" style="font-weight:700;color:' +
+      (r.kind === 'ความดี' ? 'var(--series-1)' : 'var(--series-2)') + '">' +
+      (r.kind === 'ความดี' ? '+' : '−') + r.points + '</td>' +
+    '<td class="small">' + esc(r.category) + '</td>' +
+    (r.kind === 'ความผิด'
+      ? '<td><span class="badge ' + sevClass + '">' + esc(sevText) + '</span></td>'
+      : '<td class="small">' + (r.maxPerTerm ? r.maxPerTerm + ' ครั้ง' : 'ไม่จำกัด') + '</td>') +
+    '<td>' + (r.active ? '<span class="badge badge-good">ใช้งาน</span>'
+                       : '<span class="badge">ปิดใช้งาน</span>') + '</td>' +
+    '<td style="white-space:nowrap">' +
+      '<button class="btn btn-ghost btn-sm" onclick="openRuleForm(' + r.id + ')">แก้ไข</button>' +
+      '<button class="btn btn-ghost btn-sm" style="color:var(--critical)" onclick="deleteRule(' + r.id + ')">ลบ</button>' +
+    '</td></tr>';
+}
+
+function setRuleKind(kind) { RULEMGR.kind = kind; RULEMGR.q = ''; drawRulesTable(); }
+
+function openRuleForm(ruleId) {
+  var r = ruleId ? RULEMGR.list.filter(function (x) { return x.id === ruleId; })[0] : null;
+  var kind = r ? r.kind : RULEMGR.kind;
+  var isMerit = kind === 'ความดี';
+  var categories = {};
+  RULEMGR.list.forEach(function (x) { if (x.kind === kind && x.category) categories[x.category] = true; });
+
+  openModal(r ? 'แก้ไขหลักเกณฑ์ ' + r.code : 'เพิ่มหลักเกณฑ์' + (isMerit ? 'การทำความดี' : 'คะแนนไม่พึงประสงค์'),
+    '<div class="field"><label>ชื่อเกณฑ์</label>' +
+      '<textarea id="rf-name" style="min-height:60px">' + esc(r ? r.name : '') + '</textarea></div>' +
+    '<div class="row">' +
+      '<div class="field"><label>' + (isMerit ? 'คะแนนที่ได้' : 'คะแนนที่หัก') + '</label>' +
+        '<input id="rf-points" type="number" min="1" value="' + esc(r ? r.points : '') + '">' +
+        '<div class="help">ใส่เป็นจำนวนเต็มบวก' + (isMerit ? '' : ' ระบบจะหักให้เอง') + '</div></div>' +
+      '<div class="field"><label>รหัสเดิมของโรงเรียน</label>' +
+        '<input id="rf-oldcode" type="text" value="' + esc(r ? r.oldCode : '') + '">' +
+        '<div class="help">เลขรหัสในเอกสารเดิม ซ้ำกันได้ เว้นว่างได้</div></div>' +
+    '</div>' +
+    '<div class="field"><label>หมวด</label>' +
+      '<input id="rf-category" type="text" list="rf-cats" value="' + esc(r ? r.category : '') + '">' +
+      '<datalist id="rf-cats">' + Object.keys(categories).map(function (c) {
+        return '<option value="' + esc(c) + '">';
+      }).join('') + '</datalist></div>' +
+    (isMerit
+      ? '<div class="row">' +
+          '<div class="field"><label>คุณลักษณะอันพึงประสงค์</label>' +
+            '<select id="rf-trait">' + ['', 'รักชาติ ศาสน์ กษัตริย์', 'ซื่อสัตย์สุจริต', 'มีวินัย', 'ใฝ่เรียนรู้',
+              'อยู่อย่างพอเพียง', 'มุ่งมั่นในการทำงาน', 'รักความเป็นไทย', 'มีจิตสาธารณะ']
+              .map(function (t) {
+                return '<option value="' + esc(t) + '"' + (r && r.trait === t ? ' selected' : '') + '>' +
+                  (t || '— ไม่ระบุ —') + '</option>';
+              }).join('') + '</select></div>' +
+          '<div class="field"><label>เพดานครั้งต่อภาคเรียน</label>' +
+            '<input id="rf-cap" type="number" min="1" value="' + esc(r && r.maxPerTerm ? r.maxPerTerm : '') + '">' +
+            '<div class="help">เว้นว่าง = ไม่จำกัด · ตั้งไว้เพื่อกันคะแนนเฟ้อ</div></div>' +
+        '</div>'
+      : '<div class="row">' +
+          '<div class="field"><label>ระดับความรุนแรง</label>' +
+            '<select id="rf-severity">' +
+              ['', 1, 2, 3, 4].map(function (v) {
+                var label = v === '' ? '— คำนวณจากคะแนนให้อัตโนมัติ —'
+                  : v + ' · ' + ['', 'เบา', 'ปานกลาง', 'ร้ายแรง', 'ร้ายแรงมาก'][v];
+                return '<option value="' + v + '"' + (r && r.severity === v ? ' selected' : '') + '>' + label + '</option>';
+              }).join('') + '</select>' +
+            '<div class="help">ระดับ 3 ขึ้นไป ต้องให้ฝ่ายกิจการนักเรียนเป็นผู้พิจารณาเท่านั้น</div></div>' +
+          '<div class="field"><label>อ้างอิงระเบียบ</label>' +
+            '<input id="rf-legal" type="text" value="' + esc(r ? r.legalRef : '') + '"></div>' +
+        '</div>') +
+    '<div class="field"><label style="display:flex;gap:9px;align-items:center;font-weight:400">' +
+      '<input type="checkbox" id="rf-evidence" style="width:auto;min-height:0"' +
+        (r && r.requiresEvidence ? ' checked' : '') + '> บังคับให้แนบลิงก์หลักฐานทุกครั้งที่บันทึก</label></div>' +
+    '<div class="field"><label style="display:flex;gap:9px;align-items:center;font-weight:400">' +
+      '<input type="checkbox" id="rf-active" style="width:auto;min-height:0"' +
+        (!r || r.active ? ' checked' : '') + '> เปิดใช้งานเกณฑ์นี้</label></div>' +
+    '<input type="hidden" id="rf-kind" value="' + esc(kind) + '">' +
+    '<div id="rf-error"></div>',
+    '<button class="btn" onclick="closeModal()">ยกเลิก</button>' +
+    '<button class="btn btn-primary" id="rf-save">บันทึก</button>');
+
+  el('rf-save').onclick = function () {
+    var btn = this; busy(btn, true);
+    call('apiSaveRule', [S.token, {
+      id: r ? r.id : null,
+      kind: el('rf-kind').value,
+      name: el('rf-name').value,
+      points: el('rf-points').value,
+      oldCode: el('rf-oldcode').value,
+      category: el('rf-category').value,
+      trait: el('rf-trait') ? el('rf-trait').value : '',
+      severity: el('rf-severity') ? el('rf-severity').value : '',
+      legalRef: el('rf-legal') ? el('rf-legal').value : '',
+      maxPerTerm: el('rf-cap') ? el('rf-cap').value : '',
+      requiresEvidence: el('rf-evidence').checked,
+      active: el('rf-active').checked
+    }]).then(function (res) {
+      closeModal();
+      toast('บันทึกหลักเกณฑ์ ' + res.code + ' เรียบร้อย', 'ok');
+      renderRulesTab(el('admin-body'));
+    }).catch(function (e) {
+      busy(btn, false, 'บันทึก');
+      el('rf-error').innerHTML = '<div class="alert alert-error">⚠ ' + esc(e.message) + '</div>';
+    });
+  };
+}
+
+function deleteRule(ruleId) {
+  var r = RULEMGR.list.filter(function (x) { return x.id === ruleId; })[0];
+  confirmAction('ลบหลักเกณฑ์',
+    'ต้องการลบ "' + r.name + '" ใช่หรือไม่ ถ้าเกณฑ์นี้เคยถูกใช้บันทึกไปแล้ว ' +
+    'ระบบจะปิดการใช้งานแทนการลบ เพื่อรักษาประวัติของนักเรียนไว้',
+    function () {
+      call('apiDeleteRule', [S.token, ruleId]).then(function (res) {
+        toast(res.deleted ? 'ลบหลักเกณฑ์แล้ว'
+                          : 'ปิดการใช้งานแล้ว (มีบันทึกอ้างอิงอยู่ ' + res.used + ' รายการ)', 'ok');
+        renderRulesTab(el('admin-body'));
+      }).catch(function (e) { toast(e.message, 'err'); });
+    }, true);
+}
+
+/* ------------------------------------------------------------------ */
+/* 10. นำเข้าข้อมูล                                                     */
+/* ------------------------------------------------------------------ */
+
+var IMP = { types: [], typeId: null, csv: '', analysis: null };
+
+function renderImportTab(box) {
+  box.innerHTML = '<div class="card"><div class="skeleton" style="height:180px"></div></div>';
+  return call('apiImportTypes', [S.token]).then(function (types) {
+    IMP.types = types;
+    if (!types.length) {
+      box.innerHTML = '<div class="card"><div class="empty">คุณไม่มีสิทธิ์นำเข้าข้อมูลประเภทใด</div></div>';
+      return;
+    }
+    if (!IMP.typeId || !types.filter(function (t) { return t.id === IMP.typeId; }).length) {
+      IMP.typeId = types[0].id;
+    }
+    drawImportTab(box);
+  });
+}
+
+function drawImportTab(box) {
+  box = box || el('admin-body');
+  var t = IMP.types.filter(function (x) { return x.id === IMP.typeId; })[0];
+
+  box.innerHTML =
+    '<div class="card" style="margin-bottom:14px">' +
+      '<div class="card-head"><h3>เลือกประเภทข้อมูลที่ต้องการนำเข้า</h3></div>' +
+      '<div class="chips">' + IMP.types.map(function (x) {
+        return '<button class="chip' + (x.id === IMP.typeId ? ' on' : '') +
+          '" onclick="pickImportType(\'' + x.id + '\')">' + x.icon + ' ' + esc(x.name) + '</button>';
+      }).join('') + '</div>' +
+    '</div>' +
+
+    '<div class="grid grid-2">' +
+      '<div class="card">' +
+        '<div class="card-head"><h3>1. เตรียมไฟล์</h3>' +
+          '<div class="right"><button class="btn btn-sm" onclick="downloadTemplate(this)">⬇ ดาวน์โหลดแบบฟอร์ม</button></div>' +
+        '</div>' +
+        '<div class="alert alert-info">ℹ ' + esc(t.note) + '</div>' +
+        '<div class="table-wrap"><table class="data"><thead><tr>' +
+          '<th>ชื่อคอลัมน์</th><th>จำเป็น</th><th>คำอธิบาย</th></tr></thead><tbody>' +
+          t.columns.map(function (c) {
+            return '<tr><td><b>' + esc(c.key) + '</b>' +
+              (c.alias ? '<div class="small muted">ใช้ชื่ออื่นได้: ' + esc(c.alias) + '</div>' : '') + '</td>' +
+              '<td>' + (c.required ? '<span class="badge badge-crit">จำเป็น</span>'
+                                   : '<span class="small muted">ไม่บังคับ</span>') + '</td>' +
+              '<td class="small muted">' + esc(c.hint) + '</td></tr>';
+          }).join('') + '</tbody></table></div>' +
+      '</div>' +
+
+      '<div class="card">' +
+        '<div class="card-head"><h3>2. ใส่ข้อมูล</h3></div>' +
+        '<div class="field"><label>เลือกไฟล์ CSV จากเครื่อง</label>' +
+          '<input type="file" id="imp-file" accept=".csv,text/csv" onchange="readImportFile(this)">' +
+          '<div class="help">บันทึกไฟล์ Excel เป็น .csv ก่อน · ระบบรองรับทั้งภาษาไทยแบบ UTF-8 และ Windows-874</div></div>' +
+        '<div class="field"><label>หรือคัดลอกข้อมูลมาวางที่นี่</label>' +
+          '<textarea id="imp-csv" style="min-height:150px;font-family:ui-monospace,monospace;font-size:12.5px" ' +
+            'placeholder="วางข้อมูลจาก Excel หรือ Google Sheets ได้เลย (บรรทัดแรกต้องเป็นหัวตาราง)" ' +
+            'oninput="IMP.csv=this.value">' + esc(IMP.csv) + '</textarea></div>' +
+        '<button class="btn btn-primary btn-block" onclick="previewImport(this)">🔍 ตรวจสอบข้อมูลก่อนนำเข้า</button>' +
+        '<p class="small muted" style="margin:10px 0 0">ระบบจะยังไม่บันทึกอะไรลงฐานข้อมูล ' +
+          'จนกว่าคุณจะตรวจผลแล้วกดยืนยัน</p>' +
+      '</div>' +
+    '</div>' +
+    '<div id="imp-result" style="margin-top:14px"></div>';
+}
+
+function pickImportType(id) {
+  IMP.typeId = id; IMP.csv = ''; IMP.analysis = null;
+  drawImportTab();
+}
+
+/** อ่านไฟล์ CSV พร้อมเดารหัสอักขระ ไฟล์ไทยจาก Excel มักเป็น Windows-874 ไม่ใช่ UTF-8 */
+function readImportFile(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+
+  function load(encoding, onDone) {
+    var reader = new FileReader();
+    reader.onload = function () { onDone(String(reader.result || '')); };
+    reader.onerror = function () { toast('อ่านไฟล์ไม่สำเร็จ', 'err'); };
+    reader.readAsText(file, encoding);
+  }
+
+  load('utf-8', function (text) {
+    if (text.indexOf('�') >= 0) {
+      load('windows-874', function (thai) {
+        applyImportText(thai, file.name + ' (Windows-874)');
+      });
+    } else {
+      applyImportText(text, file.name);
+    }
+  });
+}
+
+function applyImportText(text, label) {
+  IMP.csv = text;
+  el('imp-csv').value = text;
+  toast('อ่านไฟล์ ' + label + ' แล้ว ' + (text.split('\n').length - 1) + ' บรรทัด', 'ok');
+}
+
+function downloadTemplate(btn) {
+  busy(btn, true);
+  call('apiImportTemplate', [S.token, IMP.typeId]).then(function (f) {
+    busy(btn, false, '⬇ ดาวน์โหลดแบบฟอร์ม');
+    // ใส่ BOM เพื่อให้ Excel เปิดไฟล์ภาษาไทยได้ถูกต้อง
+    downloadBase64(f.fileName, 'text/csv;charset=utf-8',
+      btoa(unescape(encodeURIComponent('﻿' + f.csv))));
+  }).catch(function (e) { busy(btn, false, '⬇ ดาวน์โหลดแบบฟอร์ม'); toast(e.message, 'err'); });
+}
+
+function previewImport(btn) {
+  var csv = (el('imp-csv').value || '').trim();
+  if (!csv) { toast('กรุณาใส่ข้อมูลก่อน', 'err'); return; }
+  IMP.csv = csv;
+  busy(btn, true);
+
+  call('apiImportPreview', [S.token, IMP.typeId, csv]).then(function (a) {
+    busy(btn, false, '🔍 ตรวจสอบข้อมูลก่อนนำเข้า');
+    IMP.analysis = a;
+    drawImportPreview(a);
+  }).catch(function (e) {
+    busy(btn, false, '🔍 ตรวจสอบข้อมูลก่อนนำเข้า');
+    el('imp-result').innerHTML = '<div class="card"><div class="alert alert-error">⚠ ' + esc(e.message) + '</div></div>';
+  });
+}
+
+function drawImportPreview(a) {
+  var s = a.summary;
+  var canImport = (s.create + s.update) > 0;
+  var badge = { create: 'badge-good', update: 'badge-warn', skip: 'badge', error: 'badge-crit' };
+  var label = { create: 'เพิ่มใหม่', update: 'อัปเดต', skip: 'ข้าม', error: 'ผิดพลาด' };
+
+  el('imp-result').innerHTML =
+    '<div class="card">' +
+      '<div class="card-head"><h3>ผลการตรวจสอบ — ' + esc(a.typeName) + '</h3>' +
+        '<span class="hint">ทั้งหมด ' + s.total + ' แถว</span></div>' +
+
+      '<div class="grid grid-4" style="margin-bottom:14px">' +
+        importStat('เพิ่มใหม่', s.create, 'var(--good)') +
+        importStat('อัปเดตของเดิม', s.update, 'var(--warning)') +
+        importStat('ข้าม', s.skip, 'var(--muted)') +
+        importStat('ผิดพลาด', s.error, s.error ? 'var(--critical)' : 'var(--muted)') +
+      '</div>' +
+
+      (a.unknownColumns.length
+        ? '<div class="alert alert-warn">⚠ มีคอลัมน์ที่ระบบไม่รู้จักและจะถูกข้ามไป: ' +
+          a.unknownColumns.map(esc).join(', ') + '</div>' : '') +
+      (s.error
+        ? '<div class="alert alert-error">⚠ มี ' + s.error + ' แถวที่นำเข้าไม่ได้ ' +
+          'ถ้ากดยืนยัน ระบบจะนำเข้าเฉพาะแถวที่ถูกต้อง แถวที่ผิดพลาดจะถูกข้ามไปทั้งหมด</div>' : '') +
+
+      '<div class="table-wrap" style="max-height:420px;overflow-y:auto"><table class="data"><thead><tr>' +
+        '<th>บรรทัด</th><th>สถานะ</th><th>ข้อมูล</th><th>ผลที่จะเกิดขึ้น</th></tr></thead><tbody>' +
+        a.preview.map(function (r) {
+          return '<tr><td class="num small muted">' + r.line + '</td>' +
+            '<td><span class="badge ' + badge[r.action] + '">' + label[r.action] + '</span></td>' +
+            '<td>' + esc(r.display || '—') + '</td>' +
+            '<td class="small' + (r.action === 'error' ? '' : ' muted') + '"' +
+              (r.action === 'error' ? ' style="color:var(--critical)"' : '') + '>' +
+              esc(r.message || '') + '</td></tr>';
+        }).join('') + '</tbody></table></div>' +
+      (a.truncated ? '<p class="small muted" style="margin-top:8px">แสดง ' + a.preview.length +
+        ' แถวแรกจากทั้งหมด ' + s.total + ' แถว</p>' : '') +
+
+      '<div style="display:flex;gap:9px;margin-top:16px;flex-wrap:wrap">' +
+        '<button class="btn btn-primary" onclick="commitImport(this)"' + (canImport ? '' : ' disabled') + '>' +
+          '✓ ยืนยันนำเข้า ' + (s.create + s.update) + ' แถว</button>' +
+        '<button class="btn" onclick="el(\'imp-result\').innerHTML=\'\'">ยกเลิก</button>' +
+      '</div>' +
+    '</div>';
+}
+
+function importStat(label, value, color) {
+  return '<div style="background:var(--surface-2);border-radius:10px;padding:11px 13px">' +
+    '<div class="small muted">' + esc(label) + '</div>' +
+    '<div style="font-size:22px;font-weight:700;color:' + color + '">' + value + '</div></div>';
+}
+
+function commitImport(btn) {
+  var a = IMP.analysis;
+  confirmAction('ยืนยันนำเข้าข้อมูล',
+    'ระบบจะเพิ่ม ' + a.summary.create + ' แถว และอัปเดต ' + a.summary.update + ' แถว' +
+    (a.typeId.indexOf('_records') > 0
+      ? ' จากนั้นจะคำนวณคะแนนของนักเรียนที่เกี่ยวข้องใหม่ตามลำดับเวลาจริง' : '') +
+    ' ดำเนินการต่อหรือไม่',
+    function () {
+      busy(btn, true);
+      call('apiImportCommit', [S.token, IMP.typeId, IMP.csv]).then(function (res) {
+        el('imp-result').innerHTML =
+          '<div class="card"><div class="alert alert-info" style="font-size:14.5px">' +
+            '✓ <b>นำเข้า' + esc(res.typeName) + 'เรียบร้อย</b><br>' +
+            'เพิ่มใหม่ ' + res.created + ' แถว · อัปเดต ' + res.updated + ' แถว · ' +
+            'ข้าม ' + res.skipped + ' แถว · ผิดพลาด ' + res.errors + ' แถว' +
+            (res.recomputed ? '<br>คำนวณคะแนนใหม่ให้นักเรียน ' + res.recomputed + ' รายการ' : '') +
+          '</div>' +
+          '<button class="btn" onclick="adminTab(\'import\')">นำเข้าข้อมูลชุดต่อไป</button> ' +
+          '<button class="btn btn-primary" onclick="go(\'dashboard\')">ดูแดชบอร์ด</button></div>';
+        IMP.csv = ''; IMP.analysis = null;
+        toast('นำเข้าข้อมูลเรียบร้อย', 'ok');
+      }).catch(function (e) {
+        busy(btn, false, '✓ ยืนยันนำเข้า');
+        toast(e.message, 'err');
+      });
+    });
+}
+</script>
+  <script>boot();</script>
+</body>
+</html>
